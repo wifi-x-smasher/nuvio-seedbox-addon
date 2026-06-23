@@ -70,9 +70,10 @@ const skippedFolders = [];
 // Live progress, written to scan-progress.json and shown in the admin UI.
 const prog = {
   active: true,
-  phase: "starting", // starting | movies | series | saving
+  phase: "starting", // starting | movies | series | posters | saving
   movies: { done: 0, total: 0 },
   series: { done: 0, total: 0 },
+  posters: { done: 0, total: 0 },
   current: null,
   startedAt: new Date().toISOString(),
 };
@@ -231,7 +232,7 @@ async function collectMovies(entries, seenIds) {
       name: match?.name || info.title,
       year: match?.year || (info.year ? String(info.year) : null),
       imdbId: match?.imdbId || null,
-      bpOk: match?.imdbId ? await betterposters.available(match.imdbId) : false,
+      bpOk: false, // filled in by the poster-check phase
       poster: match?.poster || null,
       background: match?.background || null,
       description: match?.description || "",
@@ -463,7 +464,7 @@ async function scanSeries() {
         genres: match?.genres || [],
         imdbId: match?.imdbId || null,
         lang: match?.lang || null,
-        bpOk: match?.imdbId ? await betterposters.available(match.imdbId) : false,
+        bpOk: false, // filled in by the poster-check phase
         folders: [], // source folder name(s) — override keys for the admin fixer
         episodes: [],
         matched: Boolean(match),
@@ -495,6 +496,24 @@ async function scanSeries() {
   return series;
 }
 
+// Verify high-quality poster availability (btttr.cc) for each matched title.
+// Done as its own phase so it's visible in the progress bar; results are cached
+// so re-scans are fast (cache hits, no network).
+async function checkPosters(items) {
+  const targets = items.filter((it) => it.matched && it.imdbId);
+  prog.phase = "posters";
+  prog.posters = { done: 0, total: targets.length };
+  prog.current = null;
+  pub();
+  for (const it of targets) {
+    prog.current = it.name;
+    pub();
+    it.bpOk = await betterposters.available(it.imdbId);
+    prog.posters.done++;
+    pub();
+  }
+}
+
 async function main() {
   const arg = (process.argv[2] || "all").toLowerCase();
   const doMovies = arg === "all" || arg === "movies";
@@ -503,10 +522,13 @@ async function main() {
   const index = store.loadIndex();
   pub();
 
+  const posterTargets = [];
+
   if (doMovies) {
     console.log("Scanning Movies/ ...");
     const movies = await scanMovies();
     index.movies = movies;
+    posterTargets.push(...movies);
     const matched = movies.filter((m) => m.matched).length;
     console.log(
       `Movies: ${movies.length} indexed (${matched} matched, ${movies.length - matched} raw).`,
@@ -517,6 +539,7 @@ async function main() {
     console.log("\nScanning TV Shows/ ...");
     const series = await scanSeries();
     index.series = series;
+    posterTargets.push(...series);
     const matched = series.filter((s) => s.matched).length;
     const eps = series.reduce((n, s) => n + s.episodes.length, 0);
     console.log(
@@ -525,6 +548,9 @@ async function main() {
       } raw), ${eps} episodes.`,
     );
   }
+
+  console.log("\nChecking posters ...");
+  await checkPosters(posterTargets);
 
   prog.phase = "saving";
   prog.current = null;
