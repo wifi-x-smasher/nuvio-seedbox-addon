@@ -8,3 +8,6 @@ data/
 *.sqlite3
 *.db
 index.json
+
+# Per-instance runtime files (use overrides.example.json as the template)
+/overrides.json
