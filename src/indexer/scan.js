@@ -30,6 +30,7 @@ const gemini = require("../metadata/gemini");
 const betterposters = require("../metadata/betterposters");
 const store = require("../store");
 const overrides = require("../overrides").load();
+const progress = require("../progress");
 
 const TMDB_DELAY_MS = 150;
 const MAX_DEPTH = 2; // how far to recurse into a series folder
@@ -65,6 +66,19 @@ let cacheStats = { hit: 0, miss: 0 };
 const orphanSubs = [];
 // Series folders skipped entirely (no video files / read error). Surfaced in admin.
 const skippedFolders = [];
+
+// Live progress, written to scan-progress.json and shown in the admin UI.
+const prog = {
+  active: true,
+  phase: "starting", // starting | movies | series | saving
+  movies: { done: 0, total: 0 },
+  series: { done: 0, total: 0 },
+  current: null,
+  startedAt: new Date().toISOString(),
+};
+function pub() {
+  progress.write(prog);
+}
 
 function toSubEntry(s, videoBase) {
   return {
@@ -253,6 +267,8 @@ async function scanMovies() {
   const seenIds = new Set();
   const movies = [];
 
+  // Gather the work first so we can report a total to the progress bar.
+  const work = []; // { kind: "flat" | "dir", entries?, dir?, label }
   for (const dirName of configuredDirs("movieDirs")) {
     let top;
     try {
@@ -261,14 +277,30 @@ async function scanMovies() {
       console.warn(`  ! failed to read movies folder "${dirName}": ${err.message}`);
       continue;
     }
-    // Flat movie files directly under the folder.
-    movies.push(...(await collectMovies(top, seenIds)));
-    // One level into movie subfolders (e.g. The.Servant.2010.../)
+    if (top.some((e) => !e.isDir && media.isVideo(e.name))) {
+      work.push({ kind: "flat", entries: top, label: `${dirName}/ (files)` });
+    }
     for (const dir of top.filter((e) => e.isDir)) {
-      console.log(`> ${dir.name}/`);
-      const inner = await wb.listDir(dir.path);
+      work.push({ kind: "dir", dir, label: dir.name });
+    }
+  }
+
+  prog.phase = "movies";
+  prog.movies.total = work.length;
+  pub();
+
+  for (const w of work) {
+    prog.current = w.label;
+    pub();
+    if (w.kind === "flat") {
+      movies.push(...(await collectMovies(w.entries, seenIds)));
+    } else {
+      console.log(`> ${w.dir.name}/`);
+      const inner = await wb.listDir(w.dir.path);
       movies.push(...(await collectMovies(inner, seenIds)));
     }
+    prog.movies.done++;
+    pub();
   }
 
   return movies;
@@ -337,7 +369,16 @@ async function scanSeries() {
   }
   const byKey = new Map(); // grouping key -> series record (merges split seasons)
 
+  prog.phase = "series";
+  prog.series.total = folders.length;
+  pub();
+
   for (const dir of folders) {
+    // Count this folder as in-progress up front so the bar advances even when a
+    // folder is skipped below (continue paths).
+    prog.series.done++;
+    prog.current = dir.name;
+    pub();
     const folderInfo = parseFolderTitle(dir.name);
     const episodes = [];
     try {
@@ -460,6 +501,7 @@ async function main() {
   const doSeries = arg === "all" || arg === "series";
 
   const index = store.loadIndex();
+  pub();
 
   if (doMovies) {
     console.log("Scanning Movies/ ...");
@@ -484,6 +526,10 @@ async function main() {
     );
   }
 
+  prog.phase = "saving";
+  prog.current = null;
+  pub();
+
   index.orphanSubs = orphanSubs;
   if (doSeries) index.skippedFolders = skippedFolders;
   store.saveIndex(index);
@@ -492,9 +538,11 @@ async function main() {
     `\nIndex written. Match cache: ${cacheStats.hit} reused, ${cacheStats.miss} freshly matched.` +
       ` Unpicked subs: ${orphanSubs.length}. Skipped folders: ${skippedFolders.length}.`,
   );
+  progress.clear();
 }
 
 main().catch((err) => {
   console.error("\nScan failed:", err.message);
+  progress.clear();
   process.exit(1);
 });

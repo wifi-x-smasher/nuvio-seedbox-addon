@@ -41,6 +41,13 @@ module.exports = function renderPage() {
   .busy { color:var(--warn); border-color:var(--warn); }
   .toast { position:fixed; bottom:18px; right:18px; background:var(--panel); border:1px solid var(--accent); color:var(--accent); padding:10px 14px; border-radius:8px; opacity:0; transition:opacity .2s; }
   .toast.show { opacity:1; }
+  .pwrap { margin-top:14px; }
+  .ptext { font-size:12px; color:var(--dim); margin-bottom:6px; display:flex; justify-content:space-between; gap:10px; }
+  .ptext .cur { color:var(--fg); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ptrack { height:10px; background:#0c100c; border:1px solid var(--line); border-radius:20px; overflow:hidden; }
+  .pfill { height:100%; background:var(--accent); width:0; transition:width .4s ease; border-radius:20px; }
+  .pfill.indet { width:35% !important; animation:slide 1.2s ease-in-out infinite; }
+  @keyframes slide { 0%{margin-left:-35%} 100%{margin-left:100%} }
 </style>
 </head>
 <body>
@@ -62,12 +69,13 @@ module.exports = function renderPage() {
       <h2 style="margin:0">Index status</h2>
       <span id="scanState" class="badge ok">idle</span>
     </div>
+    <div id="progress" class="pwrap" style="display:none"></div>
     <div class="grid" id="stats" style="margin-top:14px"></div>
     <div id="unpicked" style="margin-top:12px"></div>
     <div class="row" style="margin-top:16px">
       <button class="primary" id="btnQuick" onclick="rescan('quick')">Quick rescan</button>
       <button id="btnFull" onclick="rescan('full')">Full re-match</button>
-      <button onclick="load()">Refresh</button>
+      <button onclick="load()" title="Re-read the numbers from the server (no scan)">Refresh stats</button>
       <span class="muted" id="lastScan"></span>
     </div>
   </div>
@@ -101,6 +109,7 @@ const $ = (id) => document.getElementById(id);
 function toast(msg){ const t=$("toast"); t.textContent=msg; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),2200); }
 function copyManifest(){ navigator.clipboard.writeText($("manifest").textContent).then(()=>toast("Manifest URL copied")); }
 
+let pollTimer=null;
 async function load(){
   const s = await (await fetch("api/status")).json();
   if (s.name) { $("appName").textContent = s.name; document.title = s.name + " — Admin"; }
@@ -121,7 +130,30 @@ async function load(){
   const st=$("scanState"); st.textContent = s.scanning ? "scanning…" : "idle";
   st.className = "badge "+(s.scanning?"busy":"ok");
   $("btnQuick").disabled = s.scanning; $("btnFull").disabled = s.scanning;
+  renderProgress(s);
   renderRaw(s.raw);
+  // Poll quickly while a scan runs so the bar moves; relax when idle.
+  clearTimeout(pollTimer);
+  pollTimer = setTimeout(load, s.scanning ? 2000 : 15000);
+}
+
+function renderProgress(s){
+  const box=$("progress");
+  const p=s.progress;
+  if(!s.scanning || !p){ box.style.display="none"; box.innerHTML=""; return; }
+  let label="Preparing…", done=0, total=0;
+  if(p.phase==="movies"){ label="Scanning movies"; done=p.movies.done; total=p.movies.total; }
+  else if(p.phase==="series"){ label="Scanning series"; done=p.series.done; total=p.series.total; }
+  else if(p.phase==="saving"){ label="Saving index…"; }
+  const determinate = total>0;
+  const pct = determinate ? Math.min(100, Math.round(done/total*100)) : 0;
+  const right = determinate ? (done+" / "+total+" ("+pct+"%)") : "";
+  const cur = p.current ? esc(p.current) : "";
+  box.style.display="block";
+  box.innerHTML =
+    '<div class="ptext"><span>'+label+(cur?' — <span class="cur">'+cur+'</span>':'')+'</span><span>'+right+'</span></div>'+
+    '<div class="ptrack"><div class="pfill'+(determinate?'':' indet')+'" style="width:'+pct+'%"></div></div>'+
+    '<div class="muted" style="font-size:11px;margin-top:6px">First scan can take a few minutes — it looks up each title. This page updates automatically.</div>';
 }
 
 function renderRaw(raw){
@@ -182,7 +214,7 @@ async function saveSettings(){
 
 async function loadLog(){ const r=await (await fetch("api/log")).json(); $("log").textContent=r.log; $("log").scrollTop=$("log").scrollHeight; }
 
-load(); loadSettings(); loadLog(); setInterval(load, 15000);
+load(); loadSettings(); loadLog();
 </script>
 </body>
 </html>`;

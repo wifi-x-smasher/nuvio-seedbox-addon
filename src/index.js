@@ -28,6 +28,7 @@ const relay = require("./subs/relay");
 const admin = require("./admin");
 const onboard = require("./onboard");
 const manifest = require("./manifest");
+const progress = require("./progress");
 
 const router = getRouter(addonInterface);
 
@@ -156,10 +157,12 @@ function runScan() {
   });
   child.on("exit", (code) => {
     scanning = false;
+    progress.clear(); // drop any leftover progress file (e.g. on crash)
     console.log(`[scan] finished (exit ${code}).`);
   });
   child.on("error", (err) => {
     scanning = false;
+    progress.clear();
     console.warn(`[scan] failed to start: ${err.message}`);
   });
 }

@@ -11,6 +11,7 @@ const config = require("./config");
 const store = require("./store");
 const overrides = require("./overrides");
 const settings = require("./settings");
+const progress = require("./progress");
 const renderPage = require("./admin-page");
 
 function matches(url) {
@@ -130,7 +131,7 @@ async function handle(req, res, ctx) {
   }
 
   if (url === "/api/status" && req.method === "GET") {
-    return json(res, { ...buildStatus(), scanning: ctx.scanning() });
+    return json(res, { ...buildStatus(), scanning: ctx.scanning(), progress: progress.read() });
   }
 
   if (url === "/api/log" && req.method === "GET") {
