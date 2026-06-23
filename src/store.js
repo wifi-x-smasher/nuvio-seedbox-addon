@@ -126,7 +126,7 @@ function resolvePlayable(type, id) {
   };
 }
 
-const KNOWN_LANGS = ["ko", "zh", "ja", "th"];
+const KNOWN_LANGS = ["en", "ko", "zh", "ja", "th"];
 
 // Map a series catalog id ("wbx-series-ko", "wbx-series-other") to a predicate.
 function seriesLangPredicate(catalogId) {
