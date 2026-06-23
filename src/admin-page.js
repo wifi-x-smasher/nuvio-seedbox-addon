@@ -144,6 +144,7 @@ function renderProgress(s){
   let label="Preparing…", done=0, total=0;
   if(p.phase==="movies"){ label="Scanning movies"; done=p.movies.done; total=p.movies.total; }
   else if(p.phase==="series"){ label="Scanning series"; done=p.series.done; total=p.series.total; }
+  else if(p.phase==="posters"){ label="Checking posters"; done=p.posters.done; total=p.posters.total; }
   else if(p.phase==="saving"){ label="Saving index…"; }
   const determinate = total>0;
   const pct = determinate ? Math.min(100, Math.round(done/total*100)) : 0;
