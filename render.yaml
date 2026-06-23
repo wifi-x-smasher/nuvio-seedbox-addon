@@ -1,11 +1,11 @@
-# Render Blueprint for the Nuvio × Whatbox add-on.
+# Render Blueprint for the seedbox add-on.
 # Render serves the add-on (catalog/meta/stream/subtitles + auto re-index).
-# Media stays on Whatbox and streams player -> Whatbox directly.
+# Media stays on your seedbox and streams player -> seedbox directly.
 #
 # Secret values are marked sync:false — set them in the Render dashboard, not here.
 services:
   - type: web
-    name: nuvio-whatbox-addon
+    name: nuvio-seedbox-addon
     runtime: node
     plan: starter            # always-on + supports a persistent disk
     buildCommand: npm install
@@ -21,18 +21,22 @@ services:
         value: /data
       - key: NODE_VERSION
         value: "22"
-      - key: SCAN_INTERVAL_HOURS
-        value: "12"
+      - key: SCAN_INTERVAL_MINUTES
+        value: "720"
       # --- set these in the dashboard (sync:false keeps them out of the repo) ---
+      - key: ADDON_NAME          # display name, e.g. "Seedbox Library"
+        sync: false
       - key: ADDON_BASE_URL      # https://<your-service>.onrender.com
         sync: false
       - key: ADDON_SECRET        # node -e "console.log(require('crypto').randomBytes(24).toString('hex'))"
         sync: false
-      - key: WHATBOX_HTTP_BASE_URL
+      - key: ADMIN_PASSWORD
         sync: false
-      - key: WHATBOX_HTTP_USER
+      - key: SEEDBOX_HTTP_BASE_URL
         sync: false
-      - key: WHATBOX_HTTP_PASS
+      - key: SEEDBOX_HTTP_USER
+        sync: false
+      - key: SEEDBOX_HTTP_PASS
         sync: false
       - key: TMDB_API_KEY
         sync: false

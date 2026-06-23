@@ -1,6 +1,6 @@
 "use strict";
 
-// Scanner: walk Movies/ and TV Shows/ over the Whatbox auto-index, parse
+// Scanner: walk the configured movie/series folders over the seedbox auto-index, parse
 // filenames, match against TMDB (best effort), collect sidecar subtitles, and
 // write the index. Unmatched titles are still included with their parsed name
 // so they stay playable.
@@ -14,7 +14,7 @@ const fs = require("fs");
 const path = require("path");
 const config = require("../config");
 const settings = require("../settings");
-const wb = require("../whatbox/client");
+const wb = require("../seedbox/client");
 const media = require("../util/media");
 const {
   parseName,

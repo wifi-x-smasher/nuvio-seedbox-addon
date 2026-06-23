@@ -1,12 +1,12 @@
 "use strict";
 
 // Quick connectivity check: lists the top-level Movies/ and TV Shows/ folders
-// over the Whatbox HTTP auto-index. Run with: npm run probe
+// over the seedbox HTTP auto-index. Run with: npm run probe
 //
 // This verifies the base URL, Basic auth, and HTML parsing all work before we
 // build the full scanner on top.
 
-const wb = require("../whatbox/client");
+const wb = require("../seedbox/client");
 
 async function listTop(label, humanPath) {
   console.log(`\n== ${label} (${humanPath}) ==`);

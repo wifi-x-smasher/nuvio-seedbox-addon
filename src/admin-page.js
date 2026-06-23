@@ -10,7 +10,7 @@ module.exports = function renderPage() {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Whatbox Library — Admin</title>
+<title>Admin</title>
 <style>
   :root { --bg:#0c0f0c; --panel:#121612; --line:#1f271f; --fg:#d6e6d6; --dim:#7c8c7c; --accent:#8bff80; --warn:#ffb454; --err:#ff6b6b; }
   * { box-sizing:border-box; }
@@ -45,8 +45,8 @@ module.exports = function renderPage() {
 </head>
 <body>
 <div class="wrap">
-  <h1>Whatbox Library</h1>
-  <p class="sub">Private add-on — admin panel</p>
+  <h1 id="appName">Library</h1>
+  <p class="sub">Self-hosted add-on — admin panel</p>
 
   <div class="panel">
     <h2>Manifest</h2>
@@ -103,6 +103,7 @@ function copyManifest(){ navigator.clipboard.writeText($("manifest").textContent
 
 async function load(){
   const s = await (await fetch("api/status")).json();
+  if (s.name) { $("appName").textContent = s.name; document.title = s.name + " — Admin"; }
   $("manifest").textContent = s.manifestUrl;
   const langs = Object.entries(s.byLang).map(([k,v])=>k.toUpperCase()+" "+v).join(" · ") || "—";
   $("stats").innerHTML = [
@@ -159,9 +160,9 @@ async function loadSettings(){
     field("Poster source", sel("s_posterSource", s.posterSource, ["better","rpdb","tmdb"])) +
     field("Gemini model", txt("s_geminiModel", s.geminiModel, "gemini-flash-latest")) +
     field("Scan interval (minutes)", txt("s_scanIntervalMinutes", s.scanIntervalMinutes, "45")) +
-    field("Seedbox base URL (HTTP file index)", txt("s_whatboxBaseUrl", s.whatboxBaseUrl, "https://host/private/")) +
-    field("Seedbox username", txt("s_whatboxUser", s.whatboxUser, "")) +
-    field("Seedbox password", sec("s_whatboxPass", s.whatboxPass==="set")) +
+    field("Seedbox base URL (HTTP file index)", txt("s_seedboxBaseUrl", s.seedboxBaseUrl, "https://host/private/")) +
+    field("Seedbox username", txt("s_seedboxUser", s.seedboxUser, "")) +
+    field("Seedbox password", sec("s_seedboxPass", s.seedboxPass==="set")) +
     field("Movie folders (comma-separated)", txt("s_movieDirs", s.movieDirs, "Movies")) +
     field("Series folders (comma-separated)", txt("s_seriesDirs", s.seriesDirs, "TV Shows")) +
     field("TMDB API key", sec("s_tmdbKey", s.tmdbKey==="set")) +
@@ -171,8 +172,8 @@ async function loadSettings(){
 async function saveSettings(){
   const v=(id)=>$(id).value;
   const body={ posterSource:v("s_posterSource"), geminiModel:v("s_geminiModel"),
-    scanIntervalMinutes:v("s_scanIntervalMinutes"), whatboxBaseUrl:v("s_whatboxBaseUrl"),
-    whatboxUser:v("s_whatboxUser"), whatboxPass:v("s_whatboxPass"),
+    scanIntervalMinutes:v("s_scanIntervalMinutes"), seedboxBaseUrl:v("s_seedboxBaseUrl"),
+    seedboxUser:v("s_seedboxUser"), seedboxPass:v("s_seedboxPass"),
     movieDirs:v("s_movieDirs"), seriesDirs:v("s_seriesDirs"),
     tmdbKey:v("s_tmdbKey"), geminiKey:v("s_geminiKey"), rpdbKey:v("s_rpdbKey") };
   await fetch("api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});

@@ -16,7 +16,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const wb = require("./whatbox/client");
+const wb = require("./seedbox/client");
 const config = require("./config");
 const settings = require("./settings");
 const relay = require("./subs/relay");
@@ -216,13 +216,13 @@ async function getStreams(type, id) {
 
   const stream = {
     url: wb.fileUrl(target.streamPath),
-    name: "Whatbox",
+    name: config.addon.name,
     title:
       [target.label, target.quality, target.container].filter(Boolean).join(" ") ||
       "Direct",
   };
 
-  // Attach Basic auth so the player fetches directly from Whatbox, no relay.
+  // Attach Basic auth so the player fetches directly from the seedbox, no relay.
   const auth = wb.authHeaderValue();
   if (auth) {
     stream.behaviorHints = { proxyHeaders: { request: { Authorization: auth } } };

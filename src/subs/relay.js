@@ -1,16 +1,16 @@
 "use strict";
 
 // Subtitle relay. The Stremio/Nuvio subtitles protocol can't carry an auth
-// header, so the player cannot fetch protected Whatbox files directly the way
+// header, so the player cannot fetch protected seedbox files directly the way
 // it does for video streams. Instead we hand the player a short "/sub/<token>"
 // URL on this add-on; when the player fetches it, we pull the real file from
-// Whatbox (with Basic auth) and return the plain subtitle.
+// the seedbox (with Basic auth) and return the plain subtitle.
 //
-// The token is a base64url-encoded Whatbox path (already URL-encoded, relative
+// The token is a base64url-encoded seedbox path (already URL-encoded, relative
 // to the library base). The optional ".ext" suffix in the URL is only a format
 // hint for the player; the real path/extension lives inside the token.
 
-const wb = require("../whatbox/client");
+const wb = require("../seedbox/client");
 const media = require("../util/media");
 const { assToSrt } = require("./ass");
 
