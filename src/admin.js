@@ -7,6 +7,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 const config = require("./config");
 const store = require("./store");
 const overrides = require("./overrides");
@@ -20,13 +21,21 @@ function matches(url) {
   return p === "/admin" || p === "/admin/" || p.startsWith("/api/");
 }
 
+// Constant-time string compare so the admin password can't be guessed by
+// timing the response. (Differing lengths short-circuit, which is fine.)
+function safeEqual(a, b) {
+  const ab = Buffer.from(String(a));
+  const bb = Buffer.from(String(b));
+  return ab.length === bb.length && crypto.timingSafeEqual(ab, bb);
+}
+
 function authed(req) {
   const pw = settings.get("adminPassword");
   if (!pw) return false; // admin disabled until a password is set
   const h = req.headers.authorization || "";
   if (!h.startsWith("Basic ")) return false;
   const decoded = Buffer.from(h.slice(6), "base64").toString("utf8");
-  return decoded.slice(decoded.indexOf(":") + 1) === pw;
+  return safeEqual(decoded.slice(decoded.indexOf(":") + 1), pw);
 }
 
 function readBody(req) {

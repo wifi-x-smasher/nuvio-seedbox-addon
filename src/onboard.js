@@ -119,8 +119,11 @@ async function testConnection({ baseUrl, user, pass, movieDirs, seriesDirs }) {
 async function handle(req, res, ctx) {
   const url = req.url.split("?")[0];
 
-  // Once configured, the public setup page is closed off.
-  if (isConfigured() && (url === "/setup" || url === "/setup/")) {
+  // Once configured, the entire onboarding surface is closed off. This includes
+  // /setup/test — leaving it open would let anyone who can reach the instance
+  // use it as an unauthenticated SSRF probe (the server fetches an arbitrary
+  // URL and reports reachability). Onboarding is only meant to run pre-config.
+  if (isConfigured()) {
     res.statusCode = 404;
     res.end("Not found");
     return;
