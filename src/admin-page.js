@@ -132,6 +132,7 @@ async function load(){
   $("btnQuick").disabled = s.scanning; $("btnFull").disabled = s.scanning;
   renderProgress(s);
   renderRaw(s.raw);
+  if(s.scanning) loadLog(); // keep the log panel live during a scan
   // Poll quickly while a scan runs so the bar moves; relax when idle.
   clearTimeout(pollTimer);
   pollTimer = setTimeout(load, s.scanning ? 2000 : 15000);
@@ -157,12 +158,23 @@ function renderProgress(s){
     '<div class="muted" style="font-size:11px;margin-top:6px">First scan can take a few minutes — it looks up each title. This page updates automatically.</div>';
 }
 
+let lastRawSig=null;
 function renderRaw(raw){
+  // Only rebuild when the set of unmatched titles actually changes, so the
+  // auto-refresh poll never wipes ids you're typing (or steals focus).
+  const sig=JSON.stringify(raw.map(r=>r.type+'|'+r.key));
+  if(sig===lastRawSig) return;
+  // Preserve any ids already typed (keyed by row) across a needed rebuild.
+  const prev={};
+  document.querySelectorAll('#rawBox input[data-k]').forEach(inp=>{ if(inp.value) prev[inp.getAttribute('data-k')]=inp.value; });
+  lastRawSig=sig;
   if(!raw.length){ $("rawBox").innerHTML='<span class="ok">All titles matched 🎉</span>'; return; }
   let h='<table><tr><th>Type</th><th>Title</th><th>TMDB id</th><th></th></tr>';
   raw.forEach((r,i)=>{
+    const k=r.type+'|'+r.key;
+    const val=prev[k]?' value="'+esc(prev[k])+'"':'';
     h+='<tr><td><span class="tag">'+r.type+'</span></td><td>'+esc(r.name)+'</td>'
-      +'<td><input id="id'+i+'" placeholder="e.g. 243569" style="width:120px"></td>'
+      +'<td><input id="id'+i+'" data-k="'+esc(k)+'"'+val+' placeholder="e.g. 243569" style="width:120px"></td>'
       +'<td><button onclick="pin(\\''+r.type+'\\',\\''+esc(r.key).replace(/\'/g,"\\\\'")+'\\','+i+')">Pin</button></td></tr>';
   });
   $("rawBox").innerHTML = h+'</table><p class="muted" style="margin-top:10px">Find the id in the TMDB page URL (themoviedb.org/tv/<b>243569</b>-…). Pinning triggers a rescan.</p>';
