@@ -123,6 +123,24 @@ function createServer() {
 
 const server = createServer();
 
+// Friendly handling for the most common startup failure: the port is taken.
+server.on("error", (err) => {
+  if (err.code === "EADDRINUSE") {
+    const port = config.addon.port;
+    console.error(
+      `\nPort ${port} is already in use — likely another copy of this add-on is ` +
+        `still running, or another app has the port.\n` +
+        `Fix it one of two ways:\n` +
+        `  1. Run on a different port:  ADDON_PORT=${port + 1} npm start   ` +
+        `(PowerShell: $env:ADDON_PORT=${port + 1}; npm start)\n` +
+        `  2. Stop whatever is using port ${port}, then start again.\n`,
+    );
+    process.exit(1);
+  }
+  console.error(`Server error: ${err.message}`);
+  process.exit(1);
+});
+
 // --- Auto re-index scheduler ---------------------------------------------
 let scanning = false;
 function runScan() {
