@@ -1,0 +1,24 @@
+# Quick start:
+#   docker compose up -d
+#   open http://localhost:7700/setup  and finish setup in the browser.
+#
+# No environment variables are required — the onboarding page collects your
+# seedbox URL/credentials and API keys and stores them in ./data/settings.json.
+# (You CAN still pre-seed them by copying .env.example to .env and uncommenting
+# the env_file line below, but it's optional.)
+
+services:
+  addon:
+    build: .
+    # Or use a prebuilt image instead of build:
+    # image: ghcr.io/wifi-x-smasher/nuvio-seedbox-addon:latest
+    container_name: nuvio-seedbox-addon
+    restart: unless-stopped
+    ports:
+      - "7700:7700"
+    volumes:
+      - ./data:/data
+    # env_file: .env   # optional: pre-seed config instead of using /setup
+    environment:
+      - DATA_DIR=/data
+      - ADDON_PORT=7700
