@@ -67,7 +67,10 @@ function presentCatalogs() {
 }
 
 function base(catalogs) {
-  return {
+  // The logo is served publicly at <base>/logo.png (no secret needed), so
+  // Stremio/Nuvio can show it in the add-on list.
+  const baseUrl = (settings.get("addonBaseUrl") || "").replace(/\/+$/, "");
+  const manifest = {
     id: "community.nuvio.seedbox",
     version: "0.1.0",
     name: settings.get("addonName"),
@@ -79,6 +82,8 @@ function base(catalogs) {
     catalogs,
     behaviorHints: { configurable: false },
   };
+  if (baseUrl) manifest.logo = `${baseUrl}/logo.png`;
+  return manifest;
 }
 
 // Static superset for the SDK builder (built once at require-time is fine; the

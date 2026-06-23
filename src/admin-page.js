@@ -10,6 +10,7 @@ module.exports = function renderPage() {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="/logo.svg">
 <title>Admin</title>
 <style>
   :root { --bg:#0c0f0c; --panel:#121612; --line:#1f271f; --fg:#d6e6d6; --dim:#7c8c7c; --accent:#8bff80; --warn:#ffb454; --err:#ff6b6b; }

@@ -1,4 +1,8 @@
-# nuvio-seedbox-addon
+<p align="center">
+  <img src="src/assets/logo.svg" width="120" height="120" alt="nuvio-seedbox-addon logo">
+</p>
+
+<h1 align="center">nuvio-seedbox-addon</h1>
 
 A self-hosted [Stremio](https://www.stremio.com/) / [Nuvio](https://github.com/NuvioMedia) add-on that turns **your own seedbox** into a beautiful media library inside your player — with posters, ratings, cast, **direct streaming**, and **subtitles**. You set it up entirely in your browser; no coding.
 

@@ -33,6 +33,20 @@ const logger = require("./logger");
 
 logger.install(); // mirror console output into the in-memory buffer (admin "Recent log")
 
+// Brand assets, served publicly (the manifest's logo URL points here). Loaded
+// once at startup; missing files just mean no logo is served.
+const ASSETS = {
+  "/logo.png": { type: "image/png", body: readAsset("logo.png") },
+  "/logo.svg": { type: "image/svg+xml", body: readAsset("logo.svg") },
+};
+function readAsset(name) {
+  try {
+    return fs.readFileSync(path.join(__dirname, "assets", name));
+  } catch {
+    return null;
+  }
+}
+
 const router = getRouter(addonInterface);
 
 // Strip the (live) secret path prefix; returns the inner path, or null if it
@@ -51,6 +65,23 @@ function handleRequest(req, res) {
   if (req.url === "/healthz") {
     res.statusCode = 200;
     res.end("ok");
+    return;
+  }
+
+  // Public brand assets (logo) — referenced by the manifest so Stremio/Nuvio
+  // show it in the add-on list. Served without the secret (not sensitive).
+  const asset = ASSETS[req.url.split("?")[0]];
+  if (asset) {
+    if (!asset.body) {
+      res.statusCode = 404;
+      res.end("Not found");
+      return;
+    }
+    res.statusCode = 200;
+    res.setHeader("Content-Type", asset.type);
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.end(asset.body);
     return;
   }
 

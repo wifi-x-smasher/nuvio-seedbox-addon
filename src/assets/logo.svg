@@ -1,0 +1,10 @@
+<svg width="240" height="240" viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Seedbox add-on logo">
+  <rect x="0" y="0" width="240" height="240" rx="54" fill="#6C47FF"/>
+  <path d="M120 84 L172 110 L120 136 L68 110 Z" fill="#ffffff" fill-opacity="0.97"/>
+  <path d="M68 110 L120 136 L120 180 L68 154 Z" fill="#ffffff" fill-opacity="0.78"/>
+  <path d="M172 110 L120 136 L120 180 L172 154 Z" fill="#ffffff" fill-opacity="0.55"/>
+  <path d="M84 127 L84 163 L112 145 Z" fill="#4326A8"/>
+  <path d="M120 86 L120 62" stroke="#2BB673" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <path d="M120 70 C138 58 149 62 152 47 C137 49 126 59 120 70 Z" fill="#34D17A"/>
+  <path d="M120 76 C104 66 95 70 92 57 C105 59 114 67 120 76 Z" fill="#18C29C"/>
+</svg>
