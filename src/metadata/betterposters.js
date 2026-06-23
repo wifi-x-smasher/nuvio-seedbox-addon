@@ -50,7 +50,7 @@ async function available(imdbId) {
   if (Object.prototype.hasOwnProperty.call(cache, imdbId)) return cache[imdbId];
 
   try {
-    const res = await fetch(url, { method: "GET" });
+    const res = await fetch(url, { method: "GET", signal: AbortSignal.timeout(8000) });
     const ok = res.ok && (res.headers.get("content-type") || "").startsWith("image/");
     cache[imdbId] = ok;
     saveCache();

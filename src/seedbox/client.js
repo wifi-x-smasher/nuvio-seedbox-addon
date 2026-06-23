@@ -74,7 +74,7 @@ function parseIndexHtml(html) {
 async function listDir(encodedRelPath) {
   const rel = encodedRelPath.replace(/^\/+/, "");
   const url = fileUrl(rel);
-  const res = await fetch(url, { headers: authHeaders() });
+  const res = await fetch(url, { headers: authHeaders(), signal: AbortSignal.timeout(20000) });
   if (res.status === 401) {
     throw new Error(`Auth failed (401) for ${url}. Check SEEDBOX_HTTP_USER/PASS.`);
   }
