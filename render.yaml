@@ -1,0 +1,42 @@
+# Render Blueprint for the Nuvio × Whatbox add-on.
+# Render serves the add-on (catalog/meta/stream/subtitles + auto re-index).
+# Media stays on Whatbox and streams player -> Whatbox directly.
+#
+# Secret values are marked sync:false — set them in the Render dashboard, not here.
+services:
+  - type: web
+    name: nuvio-whatbox-addon
+    runtime: node
+    plan: starter            # always-on + supports a persistent disk
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /healthz
+    autoDeploy: true
+    disk:
+      name: nuvio-data       # persists index.json + gemini/poster/meta caches
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: DATA_DIR
+        value: /data
+      - key: NODE_VERSION
+        value: "22"
+      - key: SCAN_INTERVAL_HOURS
+        value: "12"
+      # --- set these in the dashboard (sync:false keeps them out of the repo) ---
+      - key: ADDON_BASE_URL      # https://<your-service>.onrender.com
+        sync: false
+      - key: ADDON_SECRET        # node -e "console.log(require('crypto').randomBytes(24).toString('hex'))"
+        sync: false
+      - key: WHATBOX_HTTP_BASE_URL
+        sync: false
+      - key: WHATBOX_HTTP_USER
+        sync: false
+      - key: WHATBOX_HTTP_PASS
+        sync: false
+      - key: TMDB_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: RPDB_API_KEY
+        sync: false

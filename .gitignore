@@ -1,0 +1,10 @@
+node_modules/
+.env
+*.log
+
+# Local index / cache (built by the scanner)
+data/
+*.sqlite
+*.sqlite3
+*.db
+index.json
