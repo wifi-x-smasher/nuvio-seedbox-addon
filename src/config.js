@@ -19,7 +19,11 @@ function firstOf(...names) {
   return null;
 }
 
-const baseUrl = required("ADDON_BASE_URL") || "http://127.0.0.1:7700";
+// PORT is injected by the host (Render etc.); fall back to ADDON_PORT, then 7700.
+const port = Number(process.env.PORT) || Number(process.env.ADDON_PORT) || 7700;
+// Default the base URL to the actual port so local runs and the setup hint use
+// the right address even when only ADDON_PORT is changed.
+const baseUrl = required("ADDON_BASE_URL") || `http://127.0.0.1:${port}`;
 const secret = required("ADDON_SECRET");
 
 const config = {
@@ -29,8 +33,7 @@ const config = {
   addon: {
     // Display name (manifest + admin title + stream source label).
     name: required("ADDON_NAME") || "Seedbox Library",
-    // PORT is injected by the host (Render etc.); fall back to ADDON_PORT/7700.
-    port: Number(process.env.PORT) || Number(process.env.ADDON_PORT) || 7700,
+    port,
     baseUrl,
     // Secret path segment that gates access (so a public URL can't be guessed).
     secret,
