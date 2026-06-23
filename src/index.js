@@ -29,6 +29,9 @@ const admin = require("./admin");
 const onboard = require("./onboard");
 const manifest = require("./manifest");
 const progress = require("./progress");
+const logger = require("./logger");
+
+logger.install(); // mirror console output into the in-memory buffer (admin "Recent log")
 
 const router = getRouter(addonInterface);
 
@@ -152,9 +155,12 @@ function runScan() {
   scanning = true;
   console.log("[scan] starting library scan…");
   const child = spawn(process.execPath, [path.join(__dirname, "indexer", "scan.js")], {
-    stdio: "inherit",
+    stdio: ["ignore", "pipe", "pipe"],
     env: process.env,
   });
+  // Echo the scan's output to the terminal AND capture it for the admin log.
+  child.stdout.on("data", (d) => { process.stdout.write(d); logger.push(d); });
+  child.stderr.on("data", (d) => { process.stderr.write(d); logger.push(d); });
   child.on("exit", (code) => {
     scanning = false;
     progress.clear(); // drop any leftover progress file (e.g. on crash)

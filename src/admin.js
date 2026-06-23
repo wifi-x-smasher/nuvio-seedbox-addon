@@ -12,6 +12,7 @@ const store = require("./store");
 const overrides = require("./overrides");
 const settings = require("./settings");
 const progress = require("./progress");
+const logger = require("./logger");
 const renderPage = require("./admin-page");
 
 function matches(url) {
@@ -103,14 +104,8 @@ function buildStatus() {
   };
 }
 
-function tailLog(lines = 120) {
-  try {
-    const file = path.join(process.cwd(), "addon.log");
-    const text = fs.readFileSync(file, "utf8");
-    return text.split(/\r?\n/).slice(-lines).join("\n");
-  } catch {
-    return "(no log yet)";
-  }
+function tailLog(lines = 200) {
+  return logger.tail(lines);
 }
 
 // ctx: { runScan(), scanning(): bool }
