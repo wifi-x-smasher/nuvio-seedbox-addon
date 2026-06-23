@@ -300,6 +300,15 @@ The add-on never carries your video. It hands the player a direct seedbox link p
 
 **Do I need to keep my computer on?** Only if you run it on your own computer (Options A/B). On your seedbox or Render it stays online by itself.
 
+**I got `EADDRINUSE: address already in use :::7700`.** Something else is already on port 7700 — usually another copy of the add-on still running from an earlier start. Either run on a different port, or free up 7700:
+- **Run on another port** (then use that number in `…/setup` and as your Public URL):
+  - Windows PowerShell: `$env:ADDON_PORT=7801; npm start`
+  - Mac/Linux: `ADDON_PORT=7801 npm start`
+  - Docker: change the ports line in `docker-compose.yml` to `"7801:7700"`.
+- **Free up 7700** by stopping what's using it:
+  - Windows PowerShell: `Get-NetTCPConnection -LocalPort 7700 -State Listen | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }`
+  - Mac/Linux: `lsof -ti tcp:7700 | xargs kill`
+
 ---
 
 ## License
