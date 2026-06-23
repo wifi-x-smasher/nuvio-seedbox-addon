@@ -96,4 +96,5 @@ module.exports = {
   baseUrl,
   fileUrl,
   listDir,
+  parseIndexHtml,
 };

@@ -26,15 +26,17 @@ const settings = require("./settings");
 const addonInterface = require("./addon");
 const relay = require("./subs/relay");
 const admin = require("./admin");
+const onboard = require("./onboard");
+const manifest = require("./manifest");
 
 const router = getRouter(addonInterface);
-const SECRET = config.addon.secret;
 
-// Strip the secret path prefix; returns the inner path, or null if it doesn't
-// match (reject). When no secret is configured, pass everything through.
+// Strip the (live) secret path prefix; returns the inner path, or null if it
+// doesn't match (reject). When no secret is configured, pass everything through.
 function stripSecret(url) {
-  if (!SECRET) return url;
-  const prefix = `/${SECRET}`;
+  const secret = settings.get("addonSecret");
+  if (!secret) return url;
+  const prefix = `/${secret}`;
   if (url === prefix) return "/";
   if (url.startsWith(`${prefix}/`)) return url.slice(prefix.length);
   return null;
@@ -48,6 +50,18 @@ function handleRequest(req, res) {
     return;
   }
 
+  // First-run onboarding: until configured, serve /setup and steer all else to it.
+  if (onboard.matches(req.url)) {
+    onboard.handle(req, res, { runScan });
+    return;
+  }
+  if (!onboard.isConfigured()) {
+    res.statusCode = 302;
+    res.setHeader("Location", "/setup");
+    res.end();
+    return;
+  }
+
   const inner = stripSecret(req.url);
   if (inner === null) {
     res.statusCode = 404;
@@ -55,6 +69,15 @@ function handleRequest(req, res) {
     return;
   }
   req.url = inner;
+
+  // Serve the manifest ourselves so it reflects the live add-on name and only
+  // the catalogs that currently have content (the SDK's copy is built at boot).
+  if (req.url === "/manifest.json") {
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.end(JSON.stringify(manifest.build()));
+    return;
+  }
 
   if (admin.matches(req.url)) {
     admin.handle(req, res, { runScan, scanning: () => scanning });
@@ -133,24 +156,28 @@ function indexIsEmpty() {
 }
 
 server.listen(config.addon.port, () => {
-  console.log(`${config.addon.name} add-on running on port ${config.addon.port}.`);
-  console.log(`Manifest: ${config.addon.publicUrl}/manifest.json`);
-  if (!SECRET) {
-    console.log("WARNING: ADDON_SECRET not set — the add-on is open. Set it before deploying.");
+  console.log(`${settings.get("addonName")} add-on running on port ${config.addon.port}.`);
+
+  if (onboard.isConfigured()) {
+    console.log(`Manifest: ${settings.publicUrl()}/manifest.json`);
+    if (indexIsEmpty()) {
+      console.log("[scan] index is empty — running initial scan.");
+      runScan();
+    }
+  } else {
+    const base = settings.get("addonBaseUrl") || `http://127.0.0.1:${config.addon.port}`;
+    console.log(`[setup] not configured yet — open ${base.replace(/\/+$/, "")}/setup to finish setup.`);
   }
 
-  if (indexIsEmpty()) {
-    console.log("[scan] index is empty — running initial scan.");
-    runScan();
-  }
   // Self-rescheduling so the interval (editable in admin) is re-read each cycle.
+  // Ticks no-op until the add-on is configured, so onboarding done after boot
+  // still gets automatic re-indexing without a restart.
   function scheduleNext() {
     const mins = Number(settings.get("scanIntervalMinutes")) || 720;
     setTimeout(() => {
-      runScan();
+      if (onboard.isConfigured()) runScan();
       scheduleNext();
     }, mins * 60 * 1000);
   }
   scheduleNext();
-  console.log(`[scan] auto re-index every ${settings.get("scanIntervalMinutes")} min (live-configurable).`);
 });

@@ -4,7 +4,9 @@ const { addonBuilder } = require("stremio-addon-sdk");
 const manifest = require("./manifest");
 const store = require("./store");
 
-const builder = new addonBuilder(manifest);
+// The builder gets the full catalog superset so it accepts a request for any
+// catalog id; index.js serves /manifest.json from manifest.build() (live).
+const builder = new addonBuilder(manifest.full);
 
 builder.defineCatalogHandler(async ({ type, id, extra }) => {
   const metas = await store.listCatalog(type, {
