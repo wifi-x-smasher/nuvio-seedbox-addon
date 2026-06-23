@@ -1,0 +1,5 @@
+{
+  "_help": "Manual metadata overrides. Key = exact folder name (series) or video filename (movie). Value = {\"tmdbId\": 12345} or {\"title\": \"X\", \"year\": 2024}. Easiest: use the admin panel's 'unmatched fixer'.",
+  "movies": {},
+  "series": {}
+}
