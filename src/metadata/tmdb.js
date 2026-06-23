@@ -21,7 +21,7 @@ async function getJson(path, params = {}) {
   for (const [k, v] of Object.entries(params)) {
     if (v != null && v !== "") url.searchParams.set(k, String(v));
   }
-  const res = await fetch(url);
+  const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
   if (!res.ok) return null;
   return res.json();
 }

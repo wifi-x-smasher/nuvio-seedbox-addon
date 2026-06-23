@@ -99,6 +99,7 @@ async function identify(name, type = "series") {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body,
+        signal: AbortSignal.timeout(20000),
       });
       if (res.status === 503 || res.status === 429) {
         await sleep(1000 * (attempt + 1));
