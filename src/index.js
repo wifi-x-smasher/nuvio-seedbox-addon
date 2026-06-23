@@ -6,7 +6,7 @@
 //
 // Access control: when ADDON_SECRET is set, every request must be under the
 // "/<secret>/" path (so a public URL can't be guessed/scraped — this matters
-// because stream responses carry the Whatbox credentials). Requests without the
+// because stream responses carry the seedbox credentials). Requests without the
 // secret get 404. With no secret set, the add-on is open (dev only).
 //
 // TLS: if TLS_CERT and TLS_KEY are set, serve HTTPS (with periodic cert reload
@@ -133,7 +133,7 @@ function indexIsEmpty() {
 }
 
 server.listen(config.addon.port, () => {
-  console.log(`Whatbox add-on running on port ${config.addon.port}.`);
+  console.log(`${config.addon.name} add-on running on port ${config.addon.port}.`);
   console.log(`Manifest: ${config.addon.publicUrl}/manifest.json`);
   if (!SECRET) {
     console.log("WARNING: ADDON_SECRET not set — the add-on is open. Set it before deploying.");

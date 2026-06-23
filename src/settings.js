@@ -15,10 +15,10 @@ const FILE = path.join(config.dataDir, "settings.json");
 const EDITABLE = [
   "posterSource", "geminiModel", "scanIntervalMinutes",
   "tmdbKey", "geminiKey", "rpdbKey",
-  "whatboxBaseUrl", "whatboxUser", "whatboxPass",
+  "seedboxBaseUrl", "seedboxUser", "seedboxPass",
   "movieDirs", "seriesDirs", // comma-separated folder names under the base URL
 ];
-const SECRETS = new Set(["tmdbKey", "geminiKey", "rpdbKey", "whatboxPass"]);
+const SECRETS = new Set(["tmdbKey", "geminiKey", "rpdbKey", "seedboxPass"]);
 
 function envFallback(key) {
   switch (key) {
@@ -30,9 +30,9 @@ function envFallback(key) {
     case "tmdbKey": return config.keys.tmdb;
     case "geminiKey": return config.keys.gemini;
     case "rpdbKey": return config.keys.rpdb;
-    case "whatboxBaseUrl": return config.whatbox.httpBaseUrl;
-    case "whatboxUser": return config.whatbox.httpUser;
-    case "whatboxPass": return config.whatbox.httpPass;
+    case "seedboxBaseUrl": return config.seedbox.httpBaseUrl;
+    case "seedboxUser": return config.seedbox.httpUser;
+    case "seedboxPass": return config.seedbox.httpPass;
     case "movieDirs": return process.env.MOVIE_DIRS || "Movies";
     case "seriesDirs": return process.env.SERIES_DIRS || "TV Shows";
     default: return null;

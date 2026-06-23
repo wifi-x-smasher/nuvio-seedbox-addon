@@ -10,6 +10,7 @@
 // a re-scan to pick up newly added languages.)
 
 const store = require("./store");
+const config = require("./config");
 
 // Known original-language codes -> catalog label, in display order.
 const LANG_LABELS = [
@@ -27,31 +28,31 @@ function seriesCatalogs() {
   const cats = [];
   for (const [code, label] of LANG_LABELS) {
     if (series.some((s) => s.lang === code)) {
-      cats.push({ type: "series", id: `wbx-series-${code}`, name: `Whatbox ${label}`, extra: EXTRA });
+      cats.push({ type: "series", id: `wbx-series-${code}`, name: label, extra: EXTRA });
     }
   }
   // Anything not in a known language bucket (incl. unmatched/null).
   if (series.some((s) => !KNOWN_LANGS.includes(s.lang))) {
-    cats.push({ type: "series", id: "wbx-series-other", name: "Whatbox Other", extra: EXTRA });
+    cats.push({ type: "series", id: "wbx-series-other", name: "Other Series", extra: EXTRA });
   }
   // Fallback so the catalog isn't empty before the first language-aware scan.
   if (cats.length === 0) {
-    cats.push({ type: "series", id: "wbx-series-other", name: "Whatbox Series", extra: EXTRA });
+    cats.push({ type: "series", id: "wbx-series-other", name: "Series", extra: EXTRA });
   }
   return cats;
 }
 
 const manifest = {
-  id: "community.nuvio.whatbox",
+  id: "community.nuvio.seedbox",
   version: "0.1.0",
-  name: "Whatbox Library",
+  name: config.addon.name,
   description:
-    "Personal Whatbox seedbox library: catalogs, direct streaming, and external subtitles.",
+    "Self-hosted seedbox library: catalogs, direct streaming, and external subtitles.",
   resources: ["catalog", "meta", "stream", "subtitles"],
   types: ["movie", "series"],
   idPrefixes: ["wbx:"],
   catalogs: [
-    { type: "movie", id: "wbx-movies", name: "Whatbox Movies", extra: EXTRA },
+    { type: "movie", id: "wbx-movies", name: "Movies", extra: EXTRA },
     ...seriesCatalogs(),
   ],
   behaviorHints: {

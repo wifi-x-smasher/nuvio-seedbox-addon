@@ -1,6 +1,6 @@
 "use strict";
 
-// Whatbox access via the HTTP auto-index (Apache/nginx "Index of ..." listing)
+// Seedbox access via an HTTP auto-index (Apache/nginx "Index of ..." listing)
 // with HTTP Basic auth. We read directory listings over HTTPS and build direct
 // file URLs. This needs only the base URL + credentials (no knowledge of the
 // box's local filesystem path), and the hrefs give us the exact playable URLs.
@@ -11,8 +11,8 @@
 const settings = require("../settings");
 
 function authHeaderValue() {
-  const httpUser = settings.get("whatboxUser");
-  const httpPass = settings.get("whatboxPass");
+  const httpUser = settings.get("seedboxUser");
+  const httpPass = settings.get("seedboxPass");
   if (!httpUser) return null;
   const token = Buffer.from(`${httpUser}:${httpPass || ""}`).toString("base64");
   return `Basic ${token}`;
@@ -28,8 +28,8 @@ function encodePath(humanPath) {
 }
 
 function baseUrl() {
-  const base = settings.get("whatboxBaseUrl");
-  if (!base) throw new Error("Whatbox base URL is not set");
+  const base = settings.get("seedboxBaseUrl");
+  if (!base) throw new Error("Seedbox base URL is not set");
   return base.endsWith("/") ? base : `${base}/`;
 }
 
@@ -76,7 +76,7 @@ async function listDir(encodedRelPath) {
   const url = fileUrl(rel);
   const res = await fetch(url, { headers: authHeaders() });
   if (res.status === 401) {
-    throw new Error(`Auth failed (401) for ${url}. Check WHATBOX_HTTP_USER/PASS.`);
+    throw new Error(`Auth failed (401) for ${url}. Check SEEDBOX_HTTP_USER/PASS.`);
   }
   if (!res.ok) {
     throw new Error(`Failed to list ${url}: HTTP ${res.status}`);

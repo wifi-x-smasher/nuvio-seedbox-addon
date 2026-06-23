@@ -9,6 +9,16 @@ function required(name) {
   return value && value.trim().length > 0 ? value.trim() : null;
 }
 
+// First non-empty of several env var names (so SEEDBOX_* is preferred but the
+// older WHATBOX_* names still work for anyone migrating).
+function firstOf(...names) {
+  for (const n of names) {
+    const v = required(n);
+    if (v) return v;
+  }
+  return null;
+}
+
 const baseUrl = required("ADDON_BASE_URL") || "http://127.0.0.1:7700";
 const secret = required("ADDON_SECRET");
 
@@ -17,6 +27,8 @@ const config = {
   // (e.g. Render), set DATA_DIR to the mounted path; otherwise local ./data.
   dataDir: required("DATA_DIR") || path.join(__dirname, "..", "data"),
   addon: {
+    // Display name (manifest + admin title + stream source label).
+    name: required("ADDON_NAME") || "Seedbox Library",
     // PORT is injected by the host (Render etc.); fall back to ADDON_PORT/7700.
     port: Number(process.env.PORT) || Number(process.env.ADDON_PORT) || 7700,
     baseUrl,
@@ -25,11 +37,11 @@ const config = {
     // Public base used to build manifest/relay URLs — includes the secret when set.
     publicUrl: secret ? `${baseUrl.replace(/\/+$/, "")}/${secret}` : baseUrl,
   },
-  whatbox: {
-    httpBaseUrl: required("WHATBOX_HTTP_BASE_URL"),
-    httpUser: required("WHATBOX_HTTP_USER"),
-    httpPass: required("WHATBOX_HTTP_PASS"),
-    libraryPath: required("WHATBOX_LIBRARY_PATH"),
+  seedbox: {
+    httpBaseUrl: firstOf("SEEDBOX_HTTP_BASE_URL", "WHATBOX_HTTP_BASE_URL"),
+    httpUser: firstOf("SEEDBOX_HTTP_USER", "WHATBOX_HTTP_USER"),
+    httpPass: firstOf("SEEDBOX_HTTP_PASS", "WHATBOX_HTTP_PASS"),
+    libraryPath: firstOf("SEEDBOX_LIBRARY_PATH", "WHATBOX_LIBRARY_PATH"),
   },
   keys: {
     tmdb: required("TMDB_API_KEY"),

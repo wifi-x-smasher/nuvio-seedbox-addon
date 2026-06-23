@@ -83,6 +83,7 @@ function buildStatus() {
   const skipped = idx.skippedFolders || [];
 
   return {
+    name: config.addon.name,
     movies: movies.length,
     series: series.length,
     episodes,
@@ -115,7 +116,7 @@ function tailLog(lines = 120) {
 async function handle(req, res, ctx) {
   if (!authed(req)) {
     res.statusCode = 401;
-    res.setHeader("WWW-Authenticate", 'Basic realm="Whatbox addon admin"');
+    res.setHeader("WWW-Authenticate", 'Basic realm="Seedbox addon admin"');
     res.end(process.env.ADMIN_PASSWORD ? "Authentication required" : "Admin disabled (ADMIN_PASSWORD not set)");
     return;
   }

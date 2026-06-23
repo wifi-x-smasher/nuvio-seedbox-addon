@@ -1,8 +1,8 @@
 {
-  "name": "nuvio-whatbox-addon",
+  "name": "nuvio-seedbox-addon",
   "version": "0.1.0",
   "private": true,
-  "description": "Personal Stremio/Nuvio add-on that exposes a Whatbox seedbox library as catalogs, streams, and external subtitles.",
+  "description": "Self-hosted Stremio/Nuvio add-on that exposes any HTTP-indexed seedbox library as catalogs, direct streams, and external subtitles.",
   "license": "MIT",
   "engines": {
     "node": ">=18"
