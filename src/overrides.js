@@ -1,8 +1,12 @@
 "use strict";
 
-// Manual metadata overrides, highest priority in the matcher chain. Edit
-// overrides.json at the project root to pin specific releases that automatic
-// matching gets wrong or can't find. Keyed by the exact folder name.
+// Manual metadata overrides, highest priority in the matcher chain. They pin
+// specific releases that automatic matching gets wrong or can't find, keyed by
+// the exact movie filename or series folder name.
+//
+// Stored at <DATA_DIR>/overrides.json (per-instance, gitignored) so the admin
+// "unmatched fixer" can write to it without dirtying the repo. An empty
+// overrides.example.json at the project root documents the format.
 //
 // Shapes (per key):
 //   { "tmdbId": 12345 }            -> fetch that TMDB id directly (most precise)
@@ -10,8 +14,9 @@
 
 const fs = require("fs");
 const path = require("path");
+const config = require("./config");
 
-const FILE = path.join(__dirname, "..", "overrides.json");
+const FILE = path.join(config.dataDir, "overrides.json");
 
 function load() {
   try {
@@ -26,7 +31,7 @@ function load() {
 }
 
 // Pin a TMDB id for a movie/series by its exact key (movie filename or series
-// folder name). Used by the admin "unmatched fixer". Preserves the _help note.
+// folder name). Used by the admin "unmatched fixer".
 function set(type, key, tmdbId) {
   let data;
   try {
@@ -38,6 +43,7 @@ function set(type, key, tmdbId) {
   if (!data.series) data.series = {};
   const bucket = type === "movie" ? "movies" : "series";
   data[bucket][key] = { tmdbId: Number(tmdbId) };
+  fs.mkdirSync(config.dataDir, { recursive: true });
   fs.writeFileSync(FILE, JSON.stringify(data, null, 2), "utf8");
 }
 

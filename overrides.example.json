@@ -1,0 +1,5 @@
+{
+  "_help": "OPTIONAL manual metadata overrides. You normally don't need this — use the admin panel's 'unmatched fixer', which writes to <DATA_DIR>/overrides.json for you. Key = exact series folder name or movie filename. Value = {\"tmdbId\": 12345} (most precise) or {\"title\": \"X\", \"year\": 2024}.",
+  "movies": {},
+  "series": {}
+}
