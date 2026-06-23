@@ -200,6 +200,8 @@ Then open **http://localhost:7700/setup** (or `http://HOST-IP:7700/setup`) and f
 
 When you open `…/setup`, you'll see a simple form:
 
+![The setup page](docs/preview-1.png)
+
 1. **Seedbox connection** — paste your seedbox **index URL** (e.g. `https://yourbox.host/private/`) and your **username/password**. Click **Test connection**: it confirms the add-on can reach your seedbox and finds your `Movies` and `TV Shows` folders. (Different folder names? Type yours in the boxes, comma-separated.)
 2. **Metadata** — paste your **TMDB key** from Step 1. (Gemini and RPDB keys are optional bonuses — leave blank if you don't have them.)
 3. **This add-on** — give it a **display name** (e.g. "My Library"). Leave **Public URL** as suggested unless your option above told you to set it.
