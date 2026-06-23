@@ -284,7 +284,7 @@ The add-on never carries your video. It hands the player a direct seedbox link p
 - The **secret link** makes your install URL unguessable. Don't post the full link publicly.
 - The **admin password** is separate from the secret link, so sharing the install link never exposes admin.
 - Your keys and seedbox login live only in `data/settings.json` (never uploaded) or your own env — never in this repo.
-- This repo ships **no** keys or credentials. `.env.example` is blank and `overrides.json` is empty.
+- This repo ships **no** keys or credentials. `.env.example` is blank, and runtime data (settings, overrides, index) lives only under `data/` (gitignored), never in the repo.
 
 ---
 
