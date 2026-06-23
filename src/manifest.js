@@ -4,8 +4,8 @@
 // Items use a custom id prefix ("wbx:") so this add-on owns its own metadata
 // instead of colliding with Cinemeta/other meta providers.
 //
-// Series are split into per-language catalogs (K-Drama / C-Drama / J-Drama /
-// Thai / Other). Two views of the manifest:
+// Series are split into per-language catalogs (English / Korean / Chinese /
+// Japanese / Thai / Others). Two views of the manifest:
 //   - full():    every possible catalog. Given to the SDK builder so it will
 //                accept a request for any of them even before the first scan.
 //   - build():   what we actually advertise at /manifest.json — the live add-on
@@ -18,9 +18,10 @@ const settings = require("./settings");
 
 // Known original-language codes -> catalog label, in display order.
 const LANG_LABELS = [
-  ["ko", "K-Drama"],
-  ["zh", "C-Drama"],
-  ["ja", "J-Drama"],
+  ["en", "English"],
+  ["ko", "Korean"],
+  ["zh", "Chinese"],
+  ["ja", "Japanese"],
   ["th", "Thai"],
 ];
 const KNOWN_LANGS = LANG_LABELS.map(([code]) => code);
@@ -42,7 +43,7 @@ function allCatalogs() {
       name: label,
       extra: EXTRA,
     })),
-    { type: "series", id: "wbx-series-other", name: "Other Series", extra: EXTRA },
+    { type: "series", id: "wbx-series-other", name: "Others", extra: EXTRA },
   ];
 }
 
@@ -56,7 +57,7 @@ function presentCatalogs() {
     }
   }
   if (series.some((s) => !KNOWN_LANGS.includes(s.lang))) {
-    cats.push({ type: "series", id: "wbx-series-other", name: "Other Series", extra: EXTRA });
+    cats.push({ type: "series", id: "wbx-series-other", name: "Others", extra: EXTRA });
   }
   // Fallback so the catalog isn't empty before the first language-aware scan.
   if (cats.length === 1) {
