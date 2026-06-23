@@ -19,7 +19,7 @@ function matches(url) {
 }
 
 function authed(req) {
-  const pw = process.env.ADMIN_PASSWORD;
+  const pw = settings.get("adminPassword");
   if (!pw) return false; // admin disabled until a password is set
   const h = req.headers.authorization || "";
   if (!h.startsWith("Basic ")) return false;
@@ -83,7 +83,7 @@ function buildStatus() {
   const skipped = idx.skippedFolders || [];
 
   return {
-    name: config.addon.name,
+    name: settings.get("addonName"),
     movies: movies.length,
     series: series.length,
     episodes,
@@ -98,7 +98,7 @@ function buildStatus() {
     byLang,
     lastScan: idx.updatedAt || null,
     raw,
-    manifestUrl: `${config.addon.publicUrl}/manifest.json`,
+    manifestUrl: `${settings.publicUrl()}/manifest.json`,
   };
 }
 
@@ -117,7 +117,7 @@ async function handle(req, res, ctx) {
   if (!authed(req)) {
     res.statusCode = 401;
     res.setHeader("WWW-Authenticate", 'Basic realm="Seedbox addon admin"');
-    res.end(process.env.ADMIN_PASSWORD ? "Authentication required" : "Admin disabled (ADMIN_PASSWORD not set)");
+    res.end(settings.get("adminPassword") ? "Authentication required" : "Admin disabled (no admin password set)");
     return;
   }
 

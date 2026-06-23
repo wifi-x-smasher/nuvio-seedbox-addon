@@ -216,7 +216,7 @@ async function getStreams(type, id) {
 
   const stream = {
     url: wb.fileUrl(target.streamPath),
-    name: config.addon.name,
+    name: settings.get("addonName"),
     title:
       [target.label, target.quality, target.container].filter(Boolean).join(" ") ||
       "Direct",
@@ -236,7 +236,7 @@ async function getSubtitles(type, id, extra) {
   const target = resolvePlayable(type, id);
   if (!target || target.subs.length === 0) return [];
 
-  const base = config.addon.publicUrl.replace(/\/+$/, "");
+  const base = settings.publicUrl().replace(/\/+$/, "");
   return target.subs.map((sub, i) => {
     const token = relay.encodeToken(sub.path);
     // ASS/SSA are converted to SRT by the relay, so hint .srt to the player.

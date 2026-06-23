@@ -11,14 +11,18 @@ const config = require("./config");
 
 const FILE = path.join(config.dataDir, "settings.json");
 
-// Keys the admin panel can edit, and where each falls back to in .env.
+// Keys the admin panel / onboarding can edit, and where each falls back to in .env.
 const EDITABLE = [
   "posterSource", "geminiModel", "scanIntervalMinutes",
   "tmdbKey", "geminiKey", "rpdbKey",
   "seedboxBaseUrl", "seedboxUser", "seedboxPass",
   "movieDirs", "seriesDirs", // comma-separated folder names under the base URL
+  // Bootstrap values written by the onboarding flow so the add-on can be
+  // configured entirely from the browser (no .env needed). Persisted in
+  // settings.json under DATA_DIR and read live by the server.
+  "addonName", "addonBaseUrl", "addonSecret", "adminPassword",
 ];
-const SECRETS = new Set(["tmdbKey", "geminiKey", "rpdbKey", "seedboxPass"]);
+const SECRETS = new Set(["tmdbKey", "geminiKey", "rpdbKey", "seedboxPass", "addonSecret", "adminPassword"]);
 
 function envFallback(key) {
   switch (key) {
@@ -35,6 +39,10 @@ function envFallback(key) {
     case "seedboxPass": return config.seedbox.httpPass;
     case "movieDirs": return process.env.MOVIE_DIRS || "Movies";
     case "seriesDirs": return process.env.SERIES_DIRS || "TV Shows";
+    case "addonName": return config.addon.name;
+    case "addonBaseUrl": return config.addon.baseUrl;
+    case "addonSecret": return config.addon.secret;
+    case "adminPassword": return process.env.ADMIN_PASSWORD || null;
     default: return null;
   }
 }
@@ -100,4 +108,13 @@ function masked() {
   return out;
 }
 
-module.exports = { get, update, masked, EDITABLE, SECRETS };
+// Live public base URL for building manifest/relay links — reflects the current
+// (settings-or-env) base URL and secret, so onboarding changes apply without a
+// restart. Includes the secret path segment when one is set.
+function publicUrl() {
+  const base = (get("addonBaseUrl") || "http://127.0.0.1:7700").replace(/\/+$/, "");
+  const secret = get("addonSecret");
+  return secret ? `${base}/${secret}` : base;
+}
+
+module.exports = { get, update, masked, publicUrl, EDITABLE, SECRETS };
