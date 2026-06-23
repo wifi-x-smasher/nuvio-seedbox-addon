@@ -234,7 +234,7 @@ If you run on a **home device or laptop**, its address (`localhost` / `192.168.x
 
 ## Managing your library (admin panel)
 
-Open the **admin link** from the setup page (it's your install link with `/admin` on the end). Log in with any username and the **admin password** you saved. There you can:
+Open the **admin link** from the setup page (it's your install link with `/admin` on the end). When the browser prompts for a login, the **username is `admin`** and the **password** is the admin password you set during setup (or the one that was auto-generated and shown on the done screen). There you can:
 
 - see library counts, how many titles matched, last scan time, and language breakdown;
 - check subtitle coverage and spot leftover/orphan subtitle files;

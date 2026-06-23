@@ -286,7 +286,7 @@ function renderPage() {
     <p><strong>Install URL</strong> — paste into Nuvio/Stremio → Add-ons → Install via URL:</p>
     <p><code id="manifestUrl"></code> <button class="btn copy" onclick="copy('manifestUrl')">Copy</button></p>
     <p><strong>Admin panel:</strong> <a id="adminUrl" target="_blank"></a></p>
-    <p id="pwLine"><strong>Admin password:</strong> <code id="adminPw"></code> — save this now, it won't be shown again.</p>
+    <p id="pwLine"><strong>Admin login</strong> — username <code>admin</code>, password <code id="adminPw"></code>. Save the password now, it won't be shown again.</p>
   </div>
 </div>
 
