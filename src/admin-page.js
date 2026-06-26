@@ -87,6 +87,21 @@ module.exports = function renderPage() {
   </div>
 
   <div class="panel">
+    <h2>Artwork</h2>
+    <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">
+      <div id="artworkForm" style="flex:1;min-width:240px"><span class="muted">Loading…</span></div>
+      <div style="width:150px">
+        <div class="l" style="margin-bottom:6px">Preview</div>
+        <img id="artPreview" alt="poster preview" style="width:150px;aspect-ratio:2/3;object-fit:cover;border-radius:8px;border:1px solid var(--line);background:#0c100c">
+      </div>
+    </div>
+    <div class="row" style="margin-top:6px">
+      <button class="primary" onclick="saveSettings()">Save artwork</button>
+      <span class="muted">Rich BetterPosters by default; falls back to RPDB/TMDB when unavailable. Applies live.</span>
+    </div>
+  </div>
+
+  <div class="panel">
     <h2>Settings</h2>
     <div id="settingsForm"><span class="muted">Loading…</span></div>
     <div class="row" style="margin-top:14px">
@@ -214,10 +229,27 @@ async function loadSettings(){
     field("TMDB API key", sec("s_tmdbKey", s.tmdbKey==="set")) +
     field("Gemini API key", sec("s_geminiKey", s.geminiKey==="set")) +
     field("RPDB API key", sec("s_rpdbKey", s.rpdbKey==="set"));
+
+  const optsel=(id,val,pairs)=>'<select id="'+id+'" style="width:100%" onchange="updateArtPreview()">'+pairs.map(p=>'<option value="'+p[0]+'"'+(p[0]===val?' selected':'')+'>'+p[1]+'</option>').join('')+'</select>';
+  const LANGS=[['en','English'],['es','Spanish'],['fr','French'],['de','German'],['it','Italian'],['pt','Portuguese'],['ru','Russian'],['ja','Japanese'],['ko','Korean'],['zh','Chinese'],['hi','Hindi'],['ar','Arabic'],['tr','Turkish'],['nl','Dutch'],['pl','Polish'],['sv','Swedish']];
+  const RS=[['AV','Average'],['IM','IMDb'],['TM','TMDB'],['RT','Rotten Tomatoes'],['MC','Metacritic'],['TR','Trakt']];
+  $("artworkForm").innerHTML =
+    field("Poster language", optsel("s_posterLang", s.posterLang||'en', LANGS)) +
+    field("Rating source", optsel("s_posterRatingSource", s.posterRatingSource||'AV', RS));
+  updateArtPreview();
+}
+
+function updateArtPreview(){
+  const langEl=$("s_posterLang"), rsEl=$("s_posterRatingSource");
+  if(!langEl||!rsEl) return;
+  const p=[]; if(rsEl.value&&rsEl.value!=='AV')p.push('rs='+rsEl.value); if(langEl.value&&langEl.value!=='en')p.push('lang='+langEl.value);
+  p.push('cb='+Date.now()); // cache-buster so the preview refreshes
+  $("artPreview").src='https://btttr.cc/poster-qa/imdb/poster-default/tt0903747.jpg?'+p.join('&');
 }
 async function saveSettings(){
   const v=(id)=>$(id).value;
-  const body={ posterSource:v("s_posterSource"), geminiModel:v("s_geminiModel"),
+  const body={ posterSource:v("s_posterSource"), posterLang:v("s_posterLang"), posterRatingSource:v("s_posterRatingSource"),
+    geminiModel:v("s_geminiModel"),
     scanIntervalMinutes:v("s_scanIntervalMinutes"), seedboxBaseUrl:v("s_seedboxBaseUrl"),
     seedboxUser:v("s_seedboxUser"), seedboxPass:v("s_seedboxPass"),
     movieDirs:v("s_movieDirs"), seriesDirs:v("s_seriesDirs"),

@@ -1,7 +1,12 @@
 "use strict";
 
-// BetterPosters (btttr.cc) — high-quality posters, keyed by IMDb id. Keyless,
-// no API key required. Applied at serve time alongside RPDB/TMDB.
+// BetterPosters (btttr.cc) — high-quality posters with rating/quality/genre/age
+// badges baked in, keyed by IMDb id. Keyless, no API key required. Applied at
+// serve time alongside RPDB/TMDB.
+//
+// We use the "poster-qa" key (badges on) and allow two live-editable options:
+//   - rating source (rs): IM/TM/RT/MC/TR; Average is the default (no rs param)
+//   - poster language (lang): English is the default (no lang param)
 //
 // btttr.cc returns 404 (no fallback image) for ids it doesn't have, so the
 // scanner verifies availability and records it; serve-time then falls back to
@@ -11,8 +16,15 @@
 const fs = require("fs");
 const path = require("path");
 const config = require("../config");
+const settings = require("../settings");
 
 const BASE = "https://btttr.cc";
+
+// Canonical (option-free) poster URL — used for the availability check, since
+// whether btttr.cc has a poster doesn't depend on the rating source/language.
+function canonicalUrl(imdbId) {
+  return `${BASE}/poster-qa/imdb/poster-default/${imdbId}.jpg`;
+}
 const CACHE_FILE = path.join(config.dataDir, "betterposters-cache.json");
 
 let cache = null;
@@ -34,18 +46,25 @@ function saveCache() {
   }
 }
 
-// imdbId like "tt1234567". Returns the URL string or null (invalid id).
+// imdbId like "tt1234567". Returns the serve URL (with the configured rating
+// source + language applied) or null for an invalid id.
 function posterUrl(imdbId) {
   if (!imdbId || !/^tt\d+$/.test(imdbId)) return null;
-  return `${BASE}/poster/imdb/poster-default/${imdbId}.jpg`;
+  const params = [];
+  const rs = settings.get("posterRatingSource");
+  if (rs && rs !== "AV") params.push(`rs=${encodeURIComponent(rs)}`); // Average = default (no rs)
+  const lang = settings.get("posterLang");
+  if (lang && lang !== "en") params.push(`lang=${encodeURIComponent(lang)}`); // English = default
+  const qs = params.length ? `?${params.join("&")}` : "";
+  return `${canonicalUrl(imdbId)}${qs}`;
 }
 
 // Check (and cache) whether btttr.cc actually has a poster for this id. Used by
 // the scanner. On network error, returns false (so RPDB/TMDB take over) without
 // caching, so a transient failure is retried on the next scan.
 async function available(imdbId) {
-  const url = posterUrl(imdbId);
-  if (!url) return false;
+  if (!imdbId || !/^tt\d+$/.test(imdbId)) return false;
+  const url = canonicalUrl(imdbId);
   if (!cache) cache = loadCache();
   if (Object.prototype.hasOwnProperty.call(cache, imdbId)) return cache[imdbId];
 

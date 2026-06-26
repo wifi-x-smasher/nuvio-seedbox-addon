@@ -13,7 +13,7 @@ const FILE = path.join(config.dataDir, "settings.json");
 
 // Keys the admin panel / onboarding can edit, and where each falls back to in .env.
 const EDITABLE = [
-  "posterSource", "geminiModel", "scanIntervalMinutes",
+  "posterSource", "posterLang", "posterRatingSource", "geminiModel", "scanIntervalMinutes",
   "tmdbKey", "geminiKey", "rpdbKey",
   "seedboxBaseUrl", "seedboxUser", "seedboxPass",
   "movieDirs", "seriesDirs", // comma-separated folder names under the base URL
@@ -27,6 +27,8 @@ const SECRETS = new Set(["tmdbKey", "geminiKey", "rpdbKey", "seedboxPass", "addo
 function envFallback(key) {
   switch (key) {
     case "posterSource": return (process.env.POSTER_SOURCE || "better").toLowerCase();
+    case "posterLang": return process.env.POSTER_LANG || "en";
+    case "posterRatingSource": return process.env.POSTER_RATING_SOURCE || "AV";
     case "geminiModel": return process.env.GEMINI_MODEL || "gemini-flash-latest";
     case "scanIntervalMinutes":
       return Number(process.env.SCAN_INTERVAL_MINUTES) ||
