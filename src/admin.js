@@ -64,6 +64,21 @@ function json(res, obj, code = 200) {
   res.end(JSON.stringify(obj));
 }
 
+function readJson(file) {
+  try {
+    return JSON.parse(fs.readFileSync(file, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+function writeJsonAtomic(file, obj) {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const tmp = `${file}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(obj, null, 2), "utf8");
+  fs.renameSync(tmp, file);
+}
+
 function buildStatus() {
   const idx = store.loadIndex();
   const movies = idx.movies || [];
@@ -161,6 +176,50 @@ async function handle(req, res, ctx) {
 
   if (url === "/api/test-connection" && req.method === "POST") {
     return json(res, await seedbox.testConnection());
+  }
+
+  // Download a full backup: settings (incl. secrets — admin-gated), manual
+  // overrides, and the built index (so restore avoids a re-scan).
+  if (url === "/api/backup" && req.method === "GET") {
+    const backup = {
+      kind: "nuvio-seedbox-backup",
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      settings: readJson(path.join(config.dataDir, "settings.json")) || {},
+      overrides: overrides.load(),
+      index: readJson(path.join(config.dataDir, "index.json")) || {},
+    };
+    const stamp = backup.exportedAt.slice(0, 10);
+    res.statusCode = 200;
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader("Content-Disposition", `attachment; filename="nuvio-seedbox-backup-${stamp}.json"`);
+    res.end(JSON.stringify(backup, null, 2));
+    return;
+  }
+
+  // Restore from a backup file. Each section is optional; only what's present is
+  // written. Everything is read live, so no restart is needed.
+  if (url === "/api/restore" && req.method === "POST") {
+    const body = await readBody(req);
+    if (!body || (body.kind && !String(body.kind).includes("backup"))) {
+      return json(res, { error: "That doesn't look like a backup file." }, 400);
+    }
+    const restored = [];
+    if (body.settings && typeof body.settings === "object") {
+      const f = path.join(config.dataDir, "settings.json");
+      writeJsonAtomic(f, body.settings);
+      try { fs.chmodSync(f, 0o600); } catch { /* best-effort */ }
+      restored.push("settings");
+    }
+    if (body.overrides && typeof body.overrides === "object") {
+      overrides.replace(body.overrides);
+      restored.push("overrides");
+    }
+    if (body.index && typeof body.index === "object") {
+      writeJsonAtomic(path.join(config.dataDir, "index.json"), body.index);
+      restored.push("index");
+    }
+    return json(res, { ok: true, restored });
   }
 
   if (url === "/api/rescan" && req.method === "POST") {

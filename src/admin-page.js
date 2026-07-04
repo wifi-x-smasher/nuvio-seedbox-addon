@@ -114,6 +114,17 @@ module.exports = function renderPage() {
   </div>
 
   <div class="panel">
+    <h2>Backup &amp; restore</h2>
+    <div class="row">
+      <button onclick="downloadBackup()">Download backup</button>
+      <input type="file" id="restoreFile" accept="application/json,.json" style="display:none" onchange="restoreBackup(this)">
+      <button onclick="document.getElementById('restoreFile').click()">Restore from file…</button>
+      <span class="muted">Includes settings (with secrets), pinned titles, and the index.</span>
+    </div>
+    <div id="restoreResult" class="muted" style="margin-top:10px"></div>
+  </div>
+
+  <div class="panel">
     <div class="row" style="justify-content:space-between">
       <h2 style="margin:0">Recent log</h2>
       <button onclick="loadLog()">Refresh log</button>
@@ -231,7 +242,8 @@ async function loadSettings(){
     field("Series folders (comma-separated)", txt("s_seriesDirs", s.seriesDirs, "TV Shows")) +
     field("TMDB API key", sec("s_tmdbKey", s.tmdbKey==="set")) +
     field("Gemini API key", sec("s_geminiKey", s.geminiKey==="set")) +
-    field("RPDB API key", sec("s_rpdbKey", s.rpdbKey==="set"));
+    field("RPDB API key", sec("s_rpdbKey", s.rpdbKey==="set")) +
+    field("New admin password (blank keeps current)", sec("s_adminPassword", s.adminPassword==="set"));
 
   const optsel=(id,val,pairs)=>'<select id="'+id+'" style="width:100%" onchange="updateArtPreview()">'+pairs.map(p=>'<option value="'+p[0]+'"'+(p[0]===val?' selected':'')+'>'+p[1]+'</option>').join('')+'</select>';
   const LANGS=[['en','English'],['es','Spanish'],['fr','French'],['de','German'],['it','Italian'],['pt','Portuguese'],['ru','Russian'],['ja','Japanese'],['ko','Korean'],['zh','Chinese'],['hi','Hindi'],['ar','Arabic'],['tr','Turkish'],['nl','Dutch'],['pl','Polish'],['sv','Swedish']];
@@ -262,7 +274,8 @@ async function saveSettings(){
     scanIntervalMinutes:v("s_scanIntervalMinutes"), seedboxBaseUrl:v("s_seedboxBaseUrl"),
     seedboxUser:v("s_seedboxUser"), seedboxPass:v("s_seedboxPass"),
     movieDirs:v("s_movieDirs"), seriesDirs:v("s_seriesDirs"),
-    tmdbKey:v("s_tmdbKey"), geminiKey:v("s_geminiKey"), rpdbKey:v("s_rpdbKey") };
+    tmdbKey:v("s_tmdbKey"), geminiKey:v("s_geminiKey"), rpdbKey:v("s_rpdbKey"),
+    adminPassword:v("s_adminPassword") };
   const r = await (await fetch("api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})).json();
   toast("Settings saved (live)");
   showConn(r && r.connection); // present only when connection fields were touched
@@ -275,6 +288,31 @@ async function testConnection(){
     const c = await (await fetch("api/test-connection",{method:"POST"})).json();
     showConn(c);
   } catch(e){ showConn({ok:false,error:String(e)}); }
+}
+
+async function downloadBackup(){
+  try {
+    const r = await fetch("api/backup");
+    if(!r.ok){ toast("Backup failed"); return; }
+    const blob = await r.blob();
+    const cd = r.headers.get("content-disposition")||"";
+    const m = cd.match(/filename="([^"]+)"/);
+    const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+    a.download = m?m[1]:"nuvio-backup.json"; a.click(); URL.revokeObjectURL(a.href);
+    toast("Backup downloaded");
+  } catch(e){ toast("Backup failed"); }
+}
+async function restoreBackup(input){
+  const file = input.files && input.files[0]; input.value="";
+  if(!file) return;
+  if(!confirm("Restore overwrites current settings, pins, and index. Continue?")) return;
+  const el=$("restoreResult"); el.textContent="Restoring…"; el.className="busy";
+  try {
+    const text = await file.text();
+    const r = await (await fetch("api/restore",{method:"POST",headers:{"Content-Type":"application/json"},body:text})).json();
+    if(r.ok){ el.textContent="✓ Restored: "+(r.restored.join(", ")||"nothing"); el.className="ok"; toast("Restored"); setTimeout(()=>{load();loadSettings();},1200); }
+    else { el.textContent="✗ "+(r.error||"Restore failed"); el.className="err"; }
+  } catch(e){ el.textContent="✗ "+String(e); el.className="err"; }
 }
 
 async function loadLog(){ const r=await (await fetch("api/log")).json(); $("log").textContent=r.log; $("log").scrollTop=$("log").scrollHeight; }

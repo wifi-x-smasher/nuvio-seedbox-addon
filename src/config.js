@@ -48,9 +48,7 @@ const config = {
   },
   keys: {
     tmdb: required("TMDB_API_KEY"),
-    tvdb: required("TVDB_API_KEY"),
     rpdb: required("RPDB_API_KEY"),
-    mdblist: required("MDBLIST_API_KEY"),
     gemini: required("GEMINI_API_KEY"),
   },
 };

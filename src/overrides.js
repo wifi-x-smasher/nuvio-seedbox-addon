@@ -47,4 +47,18 @@ function set(type, key, tmdbId) {
   fs.writeFileSync(FILE, JSON.stringify(data, null, 2), "utf8");
 }
 
-module.exports = { load, set };
+// Overwrite the whole overrides file (used by admin backup restore). Normalises
+// to the { movies, series } shape and writes to DATA_DIR.
+function replace(data) {
+  const out = {
+    movies: (data && data.movies) || {},
+    series: (data && data.series) || {},
+  };
+  fs.mkdirSync(config.dataDir, { recursive: true });
+  const tmp = `${FILE}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(out, null, 2), "utf8");
+  fs.renameSync(tmp, FILE);
+  return out;
+}
+
+module.exports = { load, set, replace };

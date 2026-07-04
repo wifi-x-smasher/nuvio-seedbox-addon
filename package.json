@@ -11,8 +11,8 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "probe": "node src/indexer/probe.js",
-    "scan": "node src/indexer/scan.js"
+    "scan": "node src/indexer/scan.js",
+    "test": "node --test"
   },
   "dependencies": {
     "dotenv": "^16.4.5",

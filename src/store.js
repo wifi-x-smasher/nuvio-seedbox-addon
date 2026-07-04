@@ -141,11 +141,9 @@ function seriesLangPredicate(catalogId) {
   return (s) => s.lang === code;
 }
 
-async function listCatalog(type, { search, skip, catalogId } = {}) {
-  // We return the whole library in one page; for any paginated follow-up
-  // request (skip > 0) return nothing so Nuvio doesn't duplicate the list.
-  if (Number(skip) > 0) return [];
+const PAGE_SIZE = 100; // Stremio pages catalogs in blocks of 100 via `skip`.
 
+async function listCatalog(type, { search, skip, catalogId } = {}) {
   let items = source(type).filter((item) => matchesSearch(item, search));
 
   if (type === "series") {
@@ -153,7 +151,11 @@ async function listCatalog(type, { search, skip, catalogId } = {}) {
     if (pred) items = items.filter(pred);
   }
 
-  return items.map((item) => ({
+  // Page the results so large libraries scroll instead of returning everything
+  // at once. `skip` is the offset Nuvio sends as the user scrolls; past the end
+  // it slices to an empty page, which stops pagination cleanly.
+  const start = Math.max(0, Number(skip) || 0);
+  return items.slice(start, start + PAGE_SIZE).map((item) => ({
     id: item.id,
     type: item.type,
     name: item.name,
