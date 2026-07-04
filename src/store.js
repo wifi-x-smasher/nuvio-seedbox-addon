@@ -50,7 +50,11 @@ function loadIndex() {
 function saveIndex(index) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
   const payload = { ...index, updatedAt: new Date().toISOString() };
-  fs.writeFileSync(INDEX_FILE, JSON.stringify(payload, null, 2), "utf8");
+  // Write to a temp file then rename: rename is atomic on the same filesystem,
+  // so a reader (or a crash mid-write) never sees a truncated/partial index.
+  const tmp = `${INDEX_FILE}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(payload, null, 2), "utf8");
+  fs.renameSync(tmp, INDEX_FILE);
 }
 
 function matchesSearch(item, search) {

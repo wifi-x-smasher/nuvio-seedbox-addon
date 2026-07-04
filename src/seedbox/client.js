@@ -89,6 +89,31 @@ async function listDir(encodedRelPath) {
   }));
 }
 
+// Lightweight authenticated probe of the base URL. Used by the admin panel to
+// verify credentials on save, so a wrong URL/user/pass surfaces immediately
+// instead of as silent 401s at stream time. Reads settings live (call after a
+// settings update so it tests the new values).
+async function testConnection() {
+  let url;
+  try {
+    url = baseUrl();
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+  try {
+    const res = await fetch(url, { headers: authHeaders(), signal: AbortSignal.timeout(15000) });
+    if (res.status === 401) {
+      return { ok: false, status: 401, error: "Authentication failed — check username/password." };
+    }
+    if (!res.ok) {
+      return { ok: false, status: res.status, error: `Server returned HTTP ${res.status}.` };
+    }
+    return { ok: true, status: res.status };
+  } catch (err) {
+    return { ok: false, error: `Could not reach the server: ${err.message}` };
+  }
+}
+
 module.exports = {
   authHeaderValue,
   authHeaders,
@@ -97,4 +122,5 @@ module.exports = {
   fileUrl,
   listDir,
   parseIndexHtml,
+  testConnection,
 };

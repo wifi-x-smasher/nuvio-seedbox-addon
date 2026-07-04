@@ -55,12 +55,93 @@ const matchCache = loadMatchCache();
 function saveMatchCache() {
   try {
     fs.mkdirSync(config.dataDir, { recursive: true });
-    fs.writeFileSync(MATCH_CACHE_FILE, JSON.stringify(matchCache, null, 2), "utf8");
+    const tmp = `${MATCH_CACHE_FILE}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify(matchCache, null, 2), "utf8");
+    fs.renameSync(tmp, MATCH_CACHE_FILE);
   } catch {
     /* best-effort */
   }
 }
 let cacheStats = { hit: 0, miss: 0 };
+
+// Keys actually seen this scan, so we can prune cache entries for movies/folders
+// that no longer exist (moved, renamed, deleted). Movie cache is keyed by stream
+// path, series cache by folder name — mirror those keys here.
+const seenMovieKeys = new Set();
+const seenSeriesKeys = new Set();
+
+// Drop cache entries whose key wasn't seen this scan. Only call for a bucket
+// that was actually walked (a movies-only scan must not prune the series cache).
+function pruneMatchCache(bucket, seen) {
+  let removed = 0;
+  for (const key of Object.keys(matchCache[bucket])) {
+    if (!seen.has(key)) {
+      delete matchCache[bucket][key];
+      removed++;
+    }
+  }
+  return removed;
+}
+
+// Cross-process scan lock: the auto-index scheduler spawns scans, but a manual
+// `npm run scan` can run at the same time. Two concurrent scans would race on
+// index.json / match-cache.json. An exclusive lock file lets only one run at a
+// time; a stale lock (dead pid, or older than the cap) is stolen.
+const LOCK_FILE = path.join(config.dataDir, "scan.lock");
+const STALE_LOCK_MS = 6 * 60 * 60 * 1000; // a very large library scan still finishes well under this
+
+function pidAlive(pid) {
+  if (!pid) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return err.code === "EPERM"; // exists but not signalable = alive
+  }
+}
+
+function acquireLock() {
+  fs.mkdirSync(config.dataDir, { recursive: true });
+  try {
+    const fd = fs.openSync(LOCK_FILE, "wx"); // exclusive create; fails if it exists
+    fs.writeFileSync(fd, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }));
+    fs.closeSync(fd);
+    return true;
+  } catch (err) {
+    if (err.code !== "EEXIST") throw err;
+    // A lock exists — steal it only if the holder is dead or the lock is stale.
+    let stale = false;
+    try {
+      const info = JSON.parse(fs.readFileSync(LOCK_FILE, "utf8"));
+      const ageMs = Date.now() - new Date(info.startedAt || 0).getTime();
+      stale = !pidAlive(info.pid) || ageMs > STALE_LOCK_MS;
+    } catch {
+      stale = true; // unreadable/corrupt lock — treat as stale
+    }
+    if (!stale) return false;
+    try {
+      fs.unlinkSync(LOCK_FILE);
+    } catch {
+      /* lost the race to another scan; acquire will fail again below */
+    }
+    try {
+      const fd = fs.openSync(LOCK_FILE, "wx");
+      fs.writeFileSync(fd, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }));
+      fs.closeSync(fd);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
+function releaseLock() {
+  try {
+    fs.unlinkSync(LOCK_FILE);
+  } catch {
+    /* already gone */
+  }
+}
 
 // Sidecar subtitle files that matched no video ("unpicked"). Surfaced in admin.
 const orphanSubs = [];
@@ -163,6 +244,7 @@ async function collectMovies(entries, seenIds) {
   for (const video of videos) {
     const info = parseName(video.name);
     if (info.isSeries) continue; // an episode that landed under Movies; skip
+    seenMovieKeys.add(video.path); // this file exists — keep its cache entry
 
     const hints = { anime: looksLikeAnime(video.name), lang: inferOriginLang(video.name) };
     let match = null;
@@ -380,6 +462,7 @@ async function scanSeries() {
     prog.series.done++;
     prog.current = dir.name;
     pub();
+    seenSeriesKeys.add(dir.name); // this folder exists — keep its cache entry
     const folderInfo = parseFolderTitle(dir.name);
     const episodes = [];
     try {
@@ -514,7 +597,7 @@ async function checkPosters(items) {
   }
 }
 
-async function main() {
+async function run() {
   const arg = (process.argv[2] || "all").toLowerCase();
   const doMovies = arg === "all" || arg === "movies";
   const doSeries = arg === "all" || arg === "series";
@@ -559,15 +642,39 @@ async function main() {
   index.orphanSubs = orphanSubs;
   if (doSeries) index.skippedFolders = skippedFolders;
   store.saveIndex(index);
+
+  // Prune cache entries for content that no longer exists — but only for a
+  // bucket we actually walked, so a movies-only (or series-only) run doesn't
+  // wipe the other bucket's still-valid cache.
+  let prunedMovies = 0;
+  let prunedSeries = 0;
+  if (doMovies) prunedMovies = pruneMatchCache("movies", seenMovieKeys);
+  if (doSeries) prunedSeries = pruneMatchCache("series", seenSeriesKeys);
   saveMatchCache();
+
   console.log(
-    `\nIndex written. Match cache: ${cacheStats.hit} reused, ${cacheStats.miss} freshly matched.` +
+    `\nIndex written. Match cache: ${cacheStats.hit} reused, ${cacheStats.miss} freshly matched,` +
+      ` ${prunedMovies + prunedSeries} stale pruned.` +
       ` Unpicked subs: ${orphanSubs.length}. Skipped folders: ${skippedFolders.length}.`,
   );
   progress.clear();
 }
 
+// Guard against a second scan racing this one (manual + scheduled overlap).
+async function main() {
+  if (!acquireLock()) {
+    console.log("[scan] another scan is already running — aborting this run.");
+    return;
+  }
+  try {
+    await run();
+  } finally {
+    releaseLock();
+  }
+}
+
 main().catch((err) => {
+  // run()'s try/finally already released the lock before this rejection surfaced.
   console.error("\nScan failed:", err.message);
   progress.clear();
   process.exit(1);

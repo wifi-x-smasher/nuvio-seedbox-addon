@@ -15,15 +15,43 @@ function img(path, size) {
   return path ? `${IMG}/${size}${path}` : null;
 }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// Exponential backoff, capped: 0.5s, 1s, 2s, 4s, 8s.
+const backoffMs = (attempt) => Math.min(500 * 2 ** attempt, 8000);
+const MAX_RETRIES = 4;
+
+// Fetch TMDB JSON with retry on rate limits (429), transient server errors
+// (5xx) and network/timeout failures. Without this, a burst of 429s during a
+// large scan would silently return null and leave titles unmatched. A 429's
+// Retry-After header (seconds) is honoured when present; other retries use
+// exponential backoff. Non-retryable failures (4xx other than 429) return null.
 async function getJson(path, params = {}) {
   const url = new URL(API + path);
   url.searchParams.set("api_key", apiKey());
   for (const [k, v] of Object.entries(params)) {
     if (v != null && v !== "") url.searchParams.set(k, String(v));
   }
-  const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
-  if (!res.ok) return null;
-  return res.json();
+  for (let attempt = 0; ; attempt++) {
+    let res;
+    try {
+      res = await fetch(url, { signal: AbortSignal.timeout(12000) });
+    } catch (err) {
+      // Network error or timeout — retry a few times, then give up.
+      if (attempt >= MAX_RETRIES) return null;
+      await sleep(backoffMs(attempt));
+      continue;
+    }
+    if (res.status === 429 || (res.status >= 500 && res.status <= 599)) {
+      if (attempt >= MAX_RETRIES) return null;
+      const retryAfter = Number(res.headers.get("retry-after"));
+      const waitMs =
+        Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : backoffMs(attempt);
+      await sleep(waitMs);
+      continue;
+    }
+    if (!res.ok) return null;
+    return res.json();
+  }
 }
 
 // include_adult=true is required or TMDB hides adult titles (pink films, erotic

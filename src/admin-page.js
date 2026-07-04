@@ -40,6 +40,7 @@ module.exports = function renderPage() {
   .badge { font-size:12px; padding:2px 10px; border-radius:20px; border:1px solid var(--line); }
   .ok { color:var(--accent); border-color:var(--accent); }
   .busy { color:var(--warn); border-color:var(--warn); }
+  .err { color:var(--err); border-color:var(--err); }
   .toast { position:fixed; bottom:18px; right:18px; background:var(--panel); border:1px solid var(--accent); color:var(--accent); padding:10px 14px; border-radius:8px; opacity:0; transition:opacity .2s; }
   .toast.show { opacity:1; }
   .pwrap { margin-top:14px; }
@@ -106,8 +107,10 @@ module.exports = function renderPage() {
     <div id="settingsForm"><span class="muted">Loading…</span></div>
     <div class="row" style="margin-top:14px">
       <button class="primary" onclick="saveSettings()">Save settings</button>
+      <button onclick="testConnection()">Test connection</button>
       <span class="muted">Applies live — no restart. Leave secret fields blank to keep them.</span>
     </div>
+    <div id="connResult" class="muted" style="margin-top:10px"></div>
   </div>
 
   <div class="panel">
@@ -246,6 +249,12 @@ function updateArtPreview(){
   p.push('cb='+Date.now()); // cache-buster so the preview refreshes
   $("artPreview").src='https://btttr.cc/poster-qa/imdb/poster-default/tt0903747.jpg?'+p.join('&');
 }
+function showConn(c){
+  const el=$("connResult"); if(!el) return;
+  if(!c){ el.textContent=""; el.className="muted"; return; }
+  if(c.ok){ el.textContent="✓ Connected to seedbox"+(c.status?" (HTTP "+c.status+")":""); el.className="ok"; }
+  else { el.textContent="✗ "+(c.error||"Connection failed"); el.className="err"; }
+}
 async function saveSettings(){
   const v=(id)=>$(id).value;
   const body={ posterSource:v("s_posterSource"), posterLang:v("s_posterLang"), posterRatingSource:v("s_posterRatingSource"),
@@ -254,8 +263,18 @@ async function saveSettings(){
     seedboxUser:v("s_seedboxUser"), seedboxPass:v("s_seedboxPass"),
     movieDirs:v("s_movieDirs"), seriesDirs:v("s_seriesDirs"),
     tmdbKey:v("s_tmdbKey"), geminiKey:v("s_geminiKey"), rpdbKey:v("s_rpdbKey") };
-  await fetch("api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
-  toast("Settings saved (live)"); loadSettings();
+  const r = await (await fetch("api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})).json();
+  toast("Settings saved (live)");
+  showConn(r && r.connection); // present only when connection fields were touched
+  loadSettings();
+}
+
+async function testConnection(){
+  const el=$("connResult"); if(el){ el.textContent="Testing…"; el.className="busy"; }
+  try {
+    const c = await (await fetch("api/test-connection",{method:"POST"})).json();
+    showConn(c);
+  } catch(e){ showConn({ok:false,error:String(e)}); }
 }
 
 async function loadLog(){ const r=await (await fetch("api/log")).json(); $("log").textContent=r.log; $("log").scrollTop=$("log").scrollHeight; }

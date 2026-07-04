@@ -15,6 +15,9 @@ const settings = require("./settings");
 const progress = require("./progress");
 const logger = require("./logger");
 const renderPage = require("./admin-page");
+const seedbox = require("./seedbox/client");
+
+const CONN_KEYS = ["seedboxBaseUrl", "seedboxUser", "seedboxPass"];
 
 function matches(url) {
   const p = url.split("?")[0];
@@ -148,7 +151,16 @@ async function handle(req, res, ctx) {
 
   if (url === "/api/settings" && req.method === "POST") {
     const body = await readBody(req);
-    return json(res, { ok: true, settings: settings.update(body) });
+    const updated = settings.update(body);
+    // If the save touched seedbox connection fields, verify them now (with the
+    // just-saved values) so bad creds are caught here, not at stream time.
+    let connection = null;
+    if (CONN_KEYS.some((k) => k in body)) connection = await seedbox.testConnection();
+    return json(res, { ok: true, settings: updated, connection });
+  }
+
+  if (url === "/api/test-connection" && req.method === "POST") {
+    return json(res, await seedbox.testConnection());
   }
 
   if (url === "/api/rescan" && req.method === "POST") {
