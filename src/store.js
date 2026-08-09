@@ -57,6 +57,16 @@ function saveIndex(index) {
   fs.renameSync(tmp, INDEX_FILE);
 }
 
+// Stremio parses `released` as a full RFC3339 datetime; TMDB gives a bare date
+// ("2025-11-07"), which fails to parse and takes the whole meta down with it.
+function isoDate(d) {
+  if (!d) return null;
+  const s = String(d);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return `${s}T00:00:00.000Z`;
+  const t = Date.parse(s);
+  return Number.isFinite(t) ? new Date(t).toISOString() : null;
+}
+
 function matchesSearch(item, search) {
   if (!search) return true;
   return item.name && item.name.toLowerCase().includes(search.toLowerCase());
@@ -192,8 +202,18 @@ async function getMeta(type, id) {
     if (e.lastAirDate) meta.lastAirDate = e.lastAirDate;
     if (e.director && e.director.length) meta.director = e.director;
     if (e.writer && e.writer.length) meta.writer = e.writer;
-    if (e.cast && e.cast.length) meta.app_extras = { cast: e.cast };
-    if (e.trailers && e.trailers.length) meta.trailers = e.trailers;
+    if (e.cast && e.cast.length) {
+      // Standard Stremio field (names only) + the rich Nuvio extra (with photos).
+      meta.cast = e.cast.map((c) => c.name).filter(Boolean);
+      meta.app_extras = { cast: e.cast };
+    }
+    if (e.trailers && e.trailers.length) {
+      // Stremio expects Stream objects here, NOT the raw TMDB video shape —
+      // a non-conforming entry makes its (strict) parser reject the whole meta,
+      // which shows up as a blank detail page in Stremio while Nuvio copes.
+      meta.trailers = e.trailers.map((t) => ({ source: t.key, type: "Trailer" }));
+      meta.trailerStreams = e.trailers.map((t) => ({ title: t.name || "Trailer", ytId: t.key }));
+    }
   }
 
   if (item.type === "series") {
@@ -207,7 +227,7 @@ async function getMeta(type, id) {
         episode: ep.episode,
         thumbnail: x.thumbnail || null,
         overview: x.overview || null,
-        released: x.released || null,
+        released: isoDate(x.released),
         runtime: x.runtime || undefined,
       };
     });
@@ -267,4 +287,5 @@ module.exports = {
   getMeta,
   getStreams,
   getSubtitles,
+  isoDate,
 };
