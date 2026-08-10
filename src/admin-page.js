@@ -88,6 +88,13 @@ module.exports = function renderPage() {
   </div>
 
   <div class="panel">
+    <h2>Fix a match — search your library</h2>
+    <input id="fixSearch" placeholder="Search any title in your library (matched or not)…" style="width:100%" oninput="fixSearchDebounced()">
+    <div id="fixResults" style="margin-top:10px"><span class="muted">Type at least 2 characters.</span></div>
+    <p class="muted" style="margin-top:10px">Shows each title's current TMDB id. Edit it directly, or use "Find on TMDB" to pick the right one, then update — that re-pins it and rescans.</p>
+  </div>
+
+  <div class="panel">
     <h2>Artwork</h2>
     <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">
       <div id="artworkForm" style="flex:1;min-width:240px"><span class="muted">Loading…</span></div>
@@ -313,6 +320,52 @@ async function restoreBackup(input){
     if(r.ok){ el.textContent="✓ Restored: "+(r.restored.join(", ")||"nothing"); el.className="ok"; toast("Restored"); setTimeout(()=>{load();loadSettings();},1200); }
     else { el.textContent="✗ "+(r.error||"Restore failed"); el.className="err"; }
   } catch(e){ el.textContent="✗ "+String(e); el.className="err"; }
+}
+
+let fixItems=[], fixTimer=null;
+function fixSearchDebounced(){ clearTimeout(fixTimer); fixTimer=setTimeout(fixSearch,300); }
+async function fixSearch(){
+  const q=$("fixSearch").value.trim();
+  if(q.length<2){ $("fixResults").innerHTML='<span class="muted">Type at least 2 characters.</span>'; return; }
+  let r; try { r=await (await fetch("api/library/search?q="+encodeURIComponent(q))).json(); } catch(e){ return; }
+  fixItems=r.items||[];
+  if(!fixItems.length){ $("fixResults").innerHTML='<span class="muted">Nothing in your library matches that.</span>'; return; }
+  let h='<table><tr><th>Type</th><th>Title</th><th>TMDB id</th><th></th></tr>';
+  fixItems.forEach(function(it,i){
+    const warn=it.matched?'':' <span class="tag" style="color:var(--warn);border-color:var(--warn)">unmatched</span>';
+    h+='<tr><td><span class="tag">'+it.type+'</span></td>'
+      +'<td>'+esc(it.name)+(it.year?' <span class="muted">('+esc(it.year)+')</span>':'')+warn+'</td>'
+      +'<td><input id="fixId'+i+'" value="'+(it.tmdbId||'')+'" placeholder="none" style="width:110px"></td>'
+      +'<td style="white-space:nowrap"><button onclick="tmdbLookup('+i+')">Find on TMDB</button> '
+      +'<button class="primary" onclick="fixApply('+i+')">Update &amp; rescan</button></td></tr>'
+      +'<tr><td colspan="4" id="fixCand'+i+'" style="padding:0;border:0"></td></tr>';
+  });
+  $("fixResults").innerHTML=h+'</table>';
+}
+async function tmdbLookup(i){
+  const it=fixItems[i]; if(!it) return;
+  const cell=$("fixCand"+i); cell.innerHTML='<span class="muted" style="display:block;padding:6px 0">Searching TMDB…</span>';
+  let r; try { r=await (await fetch("api/tmdb/search?type="+encodeURIComponent(it.type)+"&q="+encodeURIComponent(it.name))).json(); } catch(e){ cell.innerHTML='<span class="err">TMDB search failed.</span>'; return; }
+  const res=r.results||[];
+  if(!res.length){ cell.innerHTML='<span class="muted" style="display:block;padding:6px 0">No TMDB results — try editing the id manually.</span>'; return; }
+  cell.innerHTML='<div style="padding:6px 0 10px 0">'+res.map(function(c){
+    return '<div class="row" style="justify-content:space-between;padding:2px 0">'
+      +'<span>'+esc(c.name)+(c.year?' <span class="muted">('+esc(c.year)+')</span>':'')+' <span class="muted">#'+c.tmdbId+'</span></span>'
+      +'<button onclick="fixPick('+i+','+c.tmdbId+')">use this</button></div>';
+  }).join("")+'</div>';
+}
+function fixPick(i,id){
+  $("fixId"+i).value=id;
+  $("fixCand"+i).innerHTML='<span class="ok" style="display:block;padding:6px 0">Set to '+id+' — now click "Update &amp; rescan".</span>';
+}
+async function fixApply(i){
+  const it=fixItems[i]; if(!it) return;
+  const tmdbId=$("fixId"+i).value.trim();
+  if(!tmdbId){ toast("Enter a TMDB id"); return; }
+  if(!it.keys||!it.keys.length){ toast("No override key for this item — rescan first"); return; }
+  const r=await (await fetch("api/override",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:it.type,keys:it.keys,tmdbId:tmdbId})})).json();
+  if(r.ok){ $("fixCand"+i).innerHTML='<span class="ok" style="display:block;padding:6px 0">Pinned to '+esc(tmdbId)+' — rescanning…</span>'; toast("Updated — rescanning"); setTimeout(load,1500); }
+  else { toast(r.error||"Failed"); }
 }
 
 async function loadLog(){ const r=await (await fetch("api/log")).json(); $("log").textContent=r.log; $("log").scrollTop=$("log").scrollHeight; }

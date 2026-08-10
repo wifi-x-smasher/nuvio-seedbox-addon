@@ -16,6 +16,7 @@ const progress = require("./progress");
 const logger = require("./logger");
 const renderPage = require("./admin-page");
 const seedbox = require("./seedbox/client");
+const tmdb = require("./metadata/tmdb");
 
 const CONN_KEYS = ["seedboxBaseUrl", "seedboxUser", "seedboxPass"];
 
@@ -135,6 +136,50 @@ function tailLog(lines = 200) {
   return logger.tail(lines);
 }
 
+// "wbx:movie:t550" -> 550; unmatched ids ("...:f<hash>") have no TMDB id.
+function tmdbIdOf(id) {
+  const m = String(id || "").match(/^wbx:(?:movie|series):t(\d+)$/);
+  return m ? Number(m[1]) : null;
+}
+
+// Search the whole library (matched AND unmatched) so a wrong match can be
+// corrected, not just a missing one. `keys` are the override keys: the movie
+// filename, or EVERY source folder of a series — a split-season show is matched
+// per folder, so pinning only the first would leave the others on the old id.
+function searchLibrary(q, limit = 40) {
+  const query = String(q || "").trim().toLowerCase();
+  if (!query) return [];
+  const idx = store.loadIndex();
+  const out = [];
+  for (const m of idx.movies || []) {
+    if (out.length >= limit) break;
+    if (!(m.name || "").toLowerCase().includes(query)) continue;
+    out.push({
+      type: "movie",
+      name: m.name,
+      year: m.year || null,
+      tmdbId: tmdbIdOf(m.id),
+      matched: Boolean(m.matched),
+      poster: m.poster || null,
+      keys: m.file ? [m.file] : [],
+    });
+  }
+  for (const s of idx.series || []) {
+    if (out.length >= limit) break;
+    if (!(s.name || "").toLowerCase().includes(query)) continue;
+    out.push({
+      type: "series",
+      name: s.name,
+      year: s.year || null,
+      tmdbId: tmdbIdOf(s.id),
+      matched: Boolean(s.matched),
+      poster: s.poster || null,
+      keys: Array.isArray(s.folders) ? s.folders.slice() : [],
+    });
+  }
+  return out;
+}
+
 // ctx: { runScan(), scanning(): bool }
 async function handle(req, res, ctx) {
   if (!authed(req)) {
@@ -176,6 +221,33 @@ async function handle(req, res, ctx) {
 
   if (url === "/api/test-connection" && req.method === "POST") {
     return json(res, await seedbox.testConnection());
+  }
+
+  // Find a title in the library (matched or not) so its TMDB id can be fixed.
+  if (url === "/api/library/search" && req.method === "GET") {
+    const q = new URLSearchParams(req.url.split("?")[1] || "").get("q") || "";
+    return json(res, { items: searchLibrary(q) });
+  }
+
+  // Look up candidates on TMDB so the correct id can be picked without leaving
+  // the panel (uses the configured TMDB key).
+  if (url === "/api/tmdb/search" && req.method === "GET") {
+    const p = new URLSearchParams(req.url.split("?")[1] || "");
+    const q = (p.get("q") || "").trim();
+    const isMovie = p.get("type") === "movie";
+    if (!q) return json(res, { results: [] });
+    try {
+      const raw = isMovie ? await tmdb.searchMovieAll(q) : await tmdb.searchTvAll(q);
+      const results = (raw || []).slice(0, 8).map((c) => ({
+        tmdbId: c.id,
+        name: c.title || c.name,
+        year: ((c.release_date || c.first_air_date) || "").slice(0, 4) || null,
+        poster: c.poster_path ? tmdb.img(c.poster_path, "w185") : null,
+      }));
+      return json(res, { results });
+    } catch (err) {
+      return json(res, { error: `TMDB search failed: ${err.message}` }, 502);
+    }
   }
 
   // Download a full backup: settings (incl. secrets — admin-gated), manual
@@ -238,18 +310,22 @@ async function handle(req, res, ctx) {
   if (url === "/api/override" && req.method === "POST") {
     const body = await readBody(req);
     const type = body.type === "movie" ? "movie" : "series";
-    const key = String(body.key || "").trim();
+    // `keys` (all source folders of a series) is preferred; `key` stays
+    // supported for the original single-key pin flow.
+    const keys = (Array.isArray(body.keys) ? body.keys : [body.key])
+      .map((k) => String(k || "").trim())
+      .filter(Boolean);
     const tmdbId = Number(body.tmdbId);
-    if (!key || !Number.isFinite(tmdbId) || tmdbId <= 0) {
+    if (!keys.length || !Number.isFinite(tmdbId) || tmdbId <= 0) {
       return json(res, { error: "key and a valid tmdbId are required" }, 400);
     }
-    overrides.set(type, key, tmdbId);
-    // Drop any cached (wrong/empty) match for this key so the override applies.
+    for (const k of keys) overrides.set(type, k, tmdbId);
+    // Drop any cached (wrong/empty) match for these keys so the override applies.
     try {
       const cf = path.join(config.dataDir, "match-cache.json");
       const c = JSON.parse(fs.readFileSync(cf, "utf8"));
       const bucket = type === "movie" ? "movies" : "series";
-      if (c[bucket]) delete c[bucket][key];
+      if (c[bucket]) for (const k of keys) delete c[bucket][k];
       fs.writeFileSync(cf, JSON.stringify(c, null, 2), "utf8");
     } catch {
       /* no cache yet */
