@@ -115,7 +115,12 @@ function handleRequest(req, res) {
   }
 
   if (admin.matches(req.url)) {
-    admin.handle(req, res, { runScan, scanning: () => scanning });
+    admin.handle(req, res, {
+      runScan,
+      scanning: () => scanning,
+      runGapReport,
+      gapsRunning: () => gapsRunning,
+    });
     return;
   }
 
@@ -196,12 +201,38 @@ function runScan() {
     scanning = false;
     progress.clear(); // drop any leftover progress file (e.g. on crash)
     console.log(`[scan] finished (exit ${code}).`);
+    // Refresh the gap report against the new index, at most once a day.
+    if (code === 0 && gapsStale()) runGapReport();
   });
   child.on("error", (err) => {
     scanning = false;
     progress.clear();
     console.warn(`[scan] failed to start: ${err.message}`);
   });
+}
+
+// --- Library gap report (missing episodes) --------------------------------
+let gapsRunning = false;
+function runGapReport() {
+  if (gapsRunning) return;
+  gapsRunning = true;
+  console.log("[gaps] starting report…");
+  const child = spawn(process.execPath, [path.join(__dirname, "gaps", "report.js")], {
+    stdio: ["ignore", "pipe", "pipe"],
+    env: process.env,
+  });
+  child.stdout.on("data", (d) => { process.stdout.write(d); logger.push(d); });
+  child.stderr.on("data", (d) => { process.stderr.write(d); logger.push(d); });
+  child.on("exit", (code) => { gapsRunning = false; console.log(`[gaps] finished (exit ${code}).`); });
+  child.on("error", (err) => { gapsRunning = false; console.warn(`[gaps] failed to start: ${err.message}`); });
+}
+function gapsStale() {
+  try {
+    const r = JSON.parse(fs.readFileSync(path.join(config.dataDir, "gaps.json"), "utf8"));
+    return Date.now() - new Date(r.generatedAt).getTime() > 24 * 60 * 60 * 1000;
+  } catch {
+    return true; // never generated
+  }
 }
 
 function indexIsEmpty() {

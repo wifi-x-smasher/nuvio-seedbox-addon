@@ -14,7 +14,7 @@ const FILE = path.join(config.dataDir, "settings.json");
 // Keys the admin panel / onboarding can edit, and where each falls back to in .env.
 const EDITABLE = [
   "posterSource", "posterLang", "posterRatingSource", "geminiModel", "scanIntervalMinutes",
-  "bridgeImdbIds",
+  "bridgeImdbIds", "gapsIncludeSpecials",
   "tmdbKey", "geminiKey", "rpdbKey",
   "seedboxBaseUrl", "seedboxUser", "seedboxPass",
   "movieDirs", "seriesDirs", // comma-separated folder names under the base URL
@@ -35,6 +35,9 @@ function envFallback(key) {
     // (IMDb / TMDB), so the library shows up on any title's page — not only
     // inside our own catalogs.
     case "bridgeImdbIds": return process.env.BRIDGE_IMDB_IDS || "on";
+    // Specials (season 0) are excluded from the gap report by default — TMDB's
+    // specials numbering is inconsistent enough to produce mostly noise.
+    case "gapsIncludeSpecials": return process.env.GAPS_INCLUDE_SPECIALS || "off";
     case "scanIntervalMinutes":
       return Number(process.env.SCAN_INTERVAL_MINUTES) ||
         (Number(process.env.SCAN_INTERVAL_HOURS) || 12) * 60;

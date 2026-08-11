@@ -294,6 +294,19 @@ async function handle(req, res, ctx) {
     return json(res, { ok: true, restored });
   }
 
+  // --- Library gaps (missing episodes) ---
+  if (url === "/api/gaps" && req.method === "GET") {
+    const report = readJson(path.join(config.dataDir, "gaps.json"));
+    return json(res, {
+      running: ctx.gapsRunning ? ctx.gapsRunning() : false,
+      report: report || null,
+    });
+  }
+  if (url === "/api/gaps/refresh" && req.method === "POST") {
+    if (ctx.runGapReport) ctx.runGapReport();
+    return json(res, { started: true });
+  }
+
   if (url === "/api/rescan" && req.method === "POST") {
     const body = await readBody(req);
     if (body.mode === "full") {

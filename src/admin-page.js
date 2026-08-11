@@ -88,6 +88,15 @@ module.exports = function renderPage() {
   </div>
 
   <div class="panel">
+    <div class="row" style="justify-content:space-between">
+      <h2 style="margin:0">Library gaps — missing episodes</h2>
+      <button onclick="gapsRefresh()">Refresh report</button>
+    </div>
+    <div id="gapsSummary" class="muted" style="margin-top:10px">Loading…</div>
+    <div id="gapsList" style="margin-top:10px"></div>
+  </div>
+
+  <div class="panel">
     <h2>Fix a match — search your library</h2>
     <input id="fixSearch" placeholder="Search any title in your library (matched or not)…" style="width:100%" oninput="fixSearchDebounced()">
     <div id="fixResults" style="margin-top:10px"><span class="muted">Type at least 2 characters.</span></div>
@@ -323,6 +332,34 @@ async function restoreBackup(input){
   } catch(e){ el.textContent="✗ "+String(e); el.className="err"; }
 }
 
+async function loadGaps(){
+  let r; try { r=await (await fetch("api/gaps")).json(); } catch(e){ return; }
+  const sum=$("gapsSummary"), list=$("gapsList");
+  if(r.running){ sum.className="busy"; sum.textContent="Building report…"; setTimeout(loadGaps,4000); return; }
+  if(!r.report){ sum.className="muted"; sum.textContent="No report yet — click Refresh (it checks every matched series against TMDB)."; list.innerHTML=""; return; }
+  const s=r.report.summary||{};
+  sum.className="muted";
+  sum.textContent=s.complete+" complete · "+s.withGaps+" with gaps · "+s.missingEpisodes+" aired episodes missing"
+    +(s.skippedUnmatched?" · "+s.skippedUnmatched+" unmatched skipped":"")
+    +" · generated "+new Date(r.report.generatedAt).toLocaleString();
+  const series=r.report.series||[];
+  if(!series.length){ list.innerHTML='<span class="ok">Every matched series is complete 🎉</span>'; return; }
+  let h='<table><tr><th>Series</th><th>Have</th><th>Missing</th></tr>';
+  series.forEach(function(x){
+    const detail=x.seasons.map(function(se){ return "S"+se.season+": "+se.missing.join(", "); }).join(" · ");
+    const suspect=x.suspectMismatch?' <span class="tag" style="color:var(--err);border-color:var(--err)" title="Episode count is far off — this is probably a wrong TMDB match, not missing files. Fix it in “Fix a match” below.">check match</span>':'';
+    h+='<tr><td>'+esc(x.name)+(x.status?' <span class="muted">('+esc(x.status)+')</span>':'')+suspect+'</td>'
+      +'<td class="muted">'+x.haveTotal+'/'+x.airedTotal+'</td>'
+      +'<td><span class="tag" style="color:var(--warn);border-color:var(--warn)">'+x.missingCount+'</span> <span class="muted">'+esc(detail)+'</span></td></tr>';
+  });
+  list.innerHTML=h+'</table>';
+}
+async function gapsRefresh(){
+  await fetch("api/gaps/refresh",{method:"POST"});
+  const sum=$("gapsSummary"); sum.className="busy"; sum.textContent="Building report… (first run checks every series against TMDB)";
+  setTimeout(loadGaps,4000);
+}
+
 let fixItems=[], fixTimer=null;
 function fixSearchDebounced(){ clearTimeout(fixTimer); fixTimer=setTimeout(fixSearch,300); }
 async function fixSearch(){
@@ -371,7 +408,7 @@ async function fixApply(i){
 
 async function loadLog(){ const r=await (await fetch("api/log")).json(); $("log").textContent=r.log; $("log").scrollTop=$("log").scrollHeight; }
 
-load(); loadSettings(); loadLog();
+load(); loadSettings(); loadLog(); loadGaps();
 </script>
 </body>
 </html>`;
