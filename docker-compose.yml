@@ -22,3 +22,12 @@ services:
     environment:
       - DATA_DIR=/data
       - ADDON_PORT=7700
+    # Cap the container log. Docker's default json-file driver has NO size limit,
+    # and this add-on is chatty during scans (a line per title), so on a
+    # long-running container the log would grow until the host disk filled.
+    # 3 x 10MB is plenty to debug a failed scan.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
