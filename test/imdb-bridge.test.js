@@ -67,6 +67,17 @@ test("stream and subtitles claim tt, and agree with each other", () => {
   assert.deepEqual(stream.idPrefixes, subs.idPrefixes);
 });
 
+test("TOP-LEVEL idPrefixes must include the bridged prefixes", () => {
+  // Regression: Stremio picks which add-ons to query from the TOP-LEVEL list and
+  // ignores the per-resource ones. With only ["wbx:"] up here we were never asked
+  // for tt ids at all — so bridging silently did nothing, and once episodes used
+  // tt ids our own streams vanished from Stremio entirely.
+  const m = manifest.build();
+  assert.ok(m.idPrefixes.includes("tt"), "top-level must advertise tt");
+  assert.ok(m.idPrefixes.includes("tmdb:"), "top-level must advertise tmdb:");
+  assert.ok(m.idPrefixes.includes("wbx:"), "and still our own");
+});
+
 test("catalog is still advertised", () => {
   assert.ok(manifest.build().resources.includes("catalog"));
 });

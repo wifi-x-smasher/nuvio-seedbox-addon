@@ -71,16 +71,27 @@ function bridgeEnabled() {
   return !(v === false || v === "false" || v === "off" || v === "0" || v === "no");
 }
 
-// Per-resource id prefixes. We claim "tt" (Cinemeta and most catalogs) and
-// "tmdb:" (the TMDB-based add-ons) for stream/subtitles ONLY — never for meta —
-// so the library surfaces on any title's page while Cinemeta keeps ownership of
-// those detail pages. build() is served per request, so the toggle applies live.
+// Prefixes whose ids we own outright (our catalogs' items).
+const OWN_PREFIXES = ["wbx:"];
+
+// Everything we will answer a STREAM for, including bridged external ids:
+// "tt" (Cinemeta and most catalogs) and "tmdb:" (the TMDB-based add-ons).
+// This list must ALSO appear at the manifest's top level — Stremio decides which
+// add-ons to query from there and ignores the per-resource lists, so omitting it
+// means we are never asked for bridged ids at all.
+function playablePrefixes() {
+  return bridgeEnabled() ? [...OWN_PREFIXES, "tt", "tmdb:"] : OWN_PREFIXES;
+}
+
+// Per-resource id prefixes. Only stream/subtitles claim the bridged prefixes —
+// never meta — so the library surfaces on any title's page while Cinemeta keeps
+// ownership of those detail pages. build() is served per request, so the toggle
+// applies live.
 function resources(types) {
-  const ours = ["wbx:"];
-  const playable = bridgeEnabled() ? [...ours, "tt", "tmdb:"] : ours;
+  const playable = playablePrefixes();
   return [
     "catalog",
-    { name: "meta", types, idPrefixes: ours },
+    { name: "meta", types, idPrefixes: OWN_PREFIXES },
     { name: "stream", types, idPrefixes: playable },
     { name: "subtitles", types, idPrefixes: playable },
   ];
@@ -98,7 +109,7 @@ function base(catalogs) {
       "Self-hosted seedbox library: catalogs, direct streaming, and external subtitles.",
     resources: resources(["movie", "series"]),
     types: ["movie", "series"],
-    idPrefixes: ["wbx:"],
+    idPrefixes: playablePrefixes(),
     catalogs,
     behaviorHints: { configurable: false },
   };
