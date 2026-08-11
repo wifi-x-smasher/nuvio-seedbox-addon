@@ -221,10 +221,16 @@ async function getMeta(type, id) {
 
   if (item.type === "series") {
     const eps = (e && e.episodes) || {};
+    // Prefer IMDb-based episode ids ("tt0903747:1:5"). External subtitle add-ons
+    // only answer for "tt", so this makes them work when browsing our own rows —
+    // and our bridging resolves the same id straight back to our file. Falls
+    // back to our own id when there's no imdbId or the feature/bridging is off,
+    // because a "tt" id nothing can resolve would be unplayable.
+    const idBase = useImdbEpisodeIds() && item.imdbId ? item.imdbId : item.id;
     meta.videos = (item.episodes || []).map((ep) => {
       const x = eps[`${ep.season}:${ep.episode}`] || {};
       return {
-        id: `${item.id}:${ep.season}:${ep.episode}`,
+        id: `${idBase}:${ep.season}:${ep.episode}`,
         title: x.name || ep.title || `Episode ${ep.episode}`,
         season: ep.season,
         episode: ep.episode,
@@ -268,6 +274,15 @@ function isExternalId(id) {
 
 function bridgeEnabled() {
   const v = settings.get("bridgeImdbIds");
+  return !(v === false || v === "false" || v === "off" || v === "0" || v === "no");
+}
+
+// Whether series episodes should carry IMDb-based video ids. Hard-gated on
+// bridging: those ids are only playable because our own resolver understands
+// them, so with bridging off we must keep our native ids.
+function useImdbEpisodeIds() {
+  if (!bridgeEnabled()) return false;
+  const v = settings.get("episodeIdsUseImdb");
   return !(v === false || v === "false" || v === "off" || v === "0" || v === "no");
 }
 
