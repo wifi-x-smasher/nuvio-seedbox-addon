@@ -186,6 +186,9 @@ async function getMeta(type, id) {
     description: item.description || "",
     genres: item.genres || [],
     releaseInfo: item.year || undefined,
+    // Spec field: lets clients cross-reference the title (some route subtitle
+    // and rating lookups by it) even though our own id is in the "wbx:" space.
+    imdb_id: item.imdbId || undefined,
   };
 
   // Lazily enrich with full TMDB detail (cast, ratings, runtime, trailers,
