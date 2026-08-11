@@ -14,6 +14,7 @@ const FILE = path.join(config.dataDir, "settings.json");
 // Keys the admin panel / onboarding can edit, and where each falls back to in .env.
 const EDITABLE = [
   "posterSource", "posterLang", "posterRatingSource", "geminiModel", "scanIntervalMinutes",
+  "bridgeImdbIds",
   "tmdbKey", "geminiKey", "rpdbKey",
   "seedboxBaseUrl", "seedboxUser", "seedboxPass",
   "movieDirs", "seriesDirs", // comma-separated folder names under the base URL
@@ -30,6 +31,10 @@ function envFallback(key) {
     case "posterLang": return process.env.POSTER_LANG || "en";
     case "posterRatingSource": return process.env.POSTER_RATING_SOURCE || "AV";
     case "geminiModel": return process.env.GEMINI_MODEL || "gemini-flash-latest";
+    // When on, the add-on also answers stream/subtitle requests for external ids
+    // (IMDb / TMDB), so the library shows up on any title's page — not only
+    // inside our own catalogs.
+    case "bridgeImdbIds": return process.env.BRIDGE_IMDB_IDS || "on";
     case "scanIntervalMinutes":
       return Number(process.env.SCAN_INTERVAL_MINUTES) ||
         (Number(process.env.SCAN_INTERVAL_HOURS) || 12) * 60;

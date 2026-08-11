@@ -66,6 +66,26 @@ function presentCatalogs() {
   return cats;
 }
 
+function bridgeEnabled() {
+  const v = settings.get("bridgeImdbIds");
+  return !(v === false || v === "false" || v === "off" || v === "0" || v === "no");
+}
+
+// Per-resource id prefixes. We claim "tt" (Cinemeta and most catalogs) and
+// "tmdb:" (the TMDB-based add-ons) for stream/subtitles ONLY — never for meta —
+// so the library surfaces on any title's page while Cinemeta keeps ownership of
+// those detail pages. build() is served per request, so the toggle applies live.
+function resources(types) {
+  const ours = ["wbx:"];
+  const playable = bridgeEnabled() ? [...ours, "tt", "tmdb:"] : ours;
+  return [
+    "catalog",
+    { name: "meta", types, idPrefixes: ours },
+    { name: "stream", types, idPrefixes: playable },
+    { name: "subtitles", types, idPrefixes: playable },
+  ];
+}
+
 function base(catalogs) {
   // The logo is served publicly at <base>/logo.png (no secret needed), so
   // Stremio/Nuvio can show it in the add-on list.
@@ -76,7 +96,7 @@ function base(catalogs) {
     name: settings.get("addonName"),
     description:
       "Self-hosted seedbox library: catalogs, direct streaming, and external subtitles.",
-    resources: ["catalog", "meta", "stream", "subtitles"],
+    resources: resources(["movie", "series"]),
     types: ["movie", "series"],
     idPrefixes: ["wbx:"],
     catalogs,

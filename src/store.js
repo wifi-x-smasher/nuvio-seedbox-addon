@@ -236,31 +236,144 @@ async function getMeta(type, id) {
   return meta;
 }
 
-async function getStreams(type, id) {
-  const target = resolvePlayable(type, id);
-  if (!target || !target.streamPath) return [];
+// --- External id bridging --------------------------------------------------
+// Stremio asks every add-on that claims an id prefix for streams, so with this
+// on the library appears on ANY title's page — Cinemeta, search, another catalog
+// — not just inside our own rows. Supported namespaces:
+//   tt0137523 / tt0903747:1:5   IMDb  (Cinemeta and most catalogs)
+//   tmdb:550  / tmdb:1396:1:5   TMDB  (the TMDB-based add-ons)
+// Both are free for us: matched items store an imdbId, and their id encodes the
+// TMDB id ("wbx:movie:t550"). We deliberately do NOT claim these for `meta`
+// (see manifest.js), so Cinemeta keeps ownership of those detail pages.
+const IMDB_ID = /^tt\d+$/;
+const EXTERNAL_PREFIXES = ["tt", "tmdb:"];
 
-  const stream = {
-    url: wb.fileUrl(target.streamPath),
-    name: settings.get("addonName"),
-    title:
-      [target.label, target.quality, target.container].filter(Boolean).join(" ") ||
-      "Direct",
+function parseExternalId(id) {
+  const p = String(id || "").split(":");
+  if (p[0] === "tmdb" && /^\d+$/.test(p[1] || "")) {
+    return { kind: "tmdb", key: p[1], season: p[2], episode: p[3] };
+  }
+  if (IMDB_ID.test(p[0])) {
+    return { kind: "imdb", key: p[0], season: p[1], episode: p[2] };
+  }
+  return null;
+}
+
+function isExternalId(id) {
+  return typeof id === "string" && EXTERNAL_PREFIXES.some((p) => id.startsWith(p));
+}
+
+function bridgeEnabled() {
+  const v = settings.get("bridgeImdbIds");
+  return !(v === false || v === "false" || v === "off" || v === "0" || v === "no");
+}
+
+// externalId -> items, rebuilt only when index.json actually changes.
+let externalCache = { mtime: -1, imdb: null, tmdb: null };
+function externalMaps() {
+  let mtime = -1;
+  try {
+    mtime = fs.statSync(INDEX_FILE).mtimeMs;
+  } catch {
+    /* no index yet */
+  }
+  if (externalCache.imdb && externalCache.mtime === mtime) return externalCache;
+  const idx = loadIndex();
+  const maps = {
+    imdb: { movies: new Map(), series: new Map() },
+    tmdb: { movies: new Map(), series: new Map() },
   };
+  const push = (map, key, val) => {
+    const arr = map.get(key);
+    if (arr) arr.push(val);
+    else map.set(key, [val]);
+  };
+  const add = (bucket, item) => {
+    if (item.imdbId) push(maps.imdb[bucket], String(item.imdbId), item);
+    const t = tmdbIdFromId(item.id);
+    if (t) push(maps.tmdb[bucket], String(t), item);
+  };
+  for (const m of idx.movies || []) add("movies", m);
+  for (const s of idx.series || []) add("series", s);
+  externalCache = { mtime, ...maps };
+  return externalCache;
+}
+
+// Resolve a bridged external id to playable target(s). Several are possible when
+// two records share an id (e.g. distinct TMDB entries for the same film).
+function resolveExternalTargets(type, id) {
+  if (!bridgeEnabled()) return [];
+  const ref = parseExternalId(id);
+  if (!ref) return [];
+  const maps = externalMaps()[ref.kind];
+  if (!maps) return [];
+
+  if (type === "movie") {
+    if (ref.season != null) return []; // a movie id shouldn't carry S/E
+    return (maps.movies.get(ref.key) || []).map((m) => ({
+      streamPath: m.streamPath,
+      container: m.container,
+      quality: m.quality,
+      subs: m.subs || [],
+      label: null,
+    }));
+  }
+
+  const season = Number(ref.season);
+  const episode = Number(ref.episode);
+  if (!Number.isFinite(season) || !Number.isFinite(episode)) return [];
+
+  const out = [];
+  for (const s of maps.series.get(ref.key) || []) {
+    const e = (s.episodes || []).find((x) => x.season === season && x.episode === episode);
+    if (e) {
+      out.push({
+        streamPath: e.streamPath,
+        container: e.container,
+        quality: e.quality,
+        subs: e.subs || [],
+        label: `S${season}E${episode}`,
+      });
+    }
+  }
+  return out;
+}
+
+// All playable targets for an id: our own "wbx:" ids resolve to exactly one, a
+// bridged external id can resolve to several.
+function resolveTargets(type, id) {
+  if (isExternalId(id)) return resolveExternalTargets(type, id);
+  const t = resolvePlayable(type, id);
+  return t ? [t] : [];
+}
+
+async function getStreams(type, id) {
+  const targets = resolveTargets(type, id).filter((t) => t && t.streamPath);
+  if (!targets.length) return [];
 
   // Attach Basic auth so the player fetches directly from the seedbox, no relay.
   const auth = wb.authHeaderValue();
-  if (auth) {
-    stream.behaviorHints = { proxyHeaders: { request: { Authorization: auth } } };
-  }
-
-  return [stream];
+  const name = settings.get("addonName");
+  return targets.map((target) => {
+    const stream = {
+      url: wb.fileUrl(target.streamPath),
+      name,
+      title:
+        [target.label, target.quality, target.container].filter(Boolean).join(" ") || "Direct",
+    };
+    if (auth) {
+      stream.behaviorHints = { proxyHeaders: { request: { Authorization: auth } } };
+    }
+    return stream;
+  });
 }
 
 async function getSubtitles(type, id, extra) {
   void extra;
-  const target = resolvePlayable(type, id);
-  if (!target || target.subs.length === 0) return [];
+  // Works for our own ids and for bridged external ids, so a title opened from
+  // Cinemeta still gets our sidecar subtitles.
+  const target = resolveTargets(type, id).find((t) => t && t.subs && t.subs.length);
+  if (!target) return [];
 
   const base = settings.publicUrl().replace(/\/+$/, "");
   return target.subs.map((sub, i) => {

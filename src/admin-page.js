@@ -240,6 +240,7 @@ async function loadSettings(){
   const sec=(id,isSet)=>'<input id="'+id+'" type="password" autocomplete="new-password" placeholder="'+(isSet?'•••••• (set — blank keeps it)':'not set')+'" style="width:100%">';
   $("settingsForm").innerHTML =
     field("Poster source", sel("s_posterSource", s.posterSource, ["better","rpdb","tmdb"])) +
+    field("Show my library on any title (IMDb/TMDB bridging)", sel("s_bridgeImdbIds", s.bridgeImdbIds, ["on","off"])) +
     field("Gemini model", txt("s_geminiModel", s.geminiModel, "gemini-flash-latest")) +
     field("Scan interval (minutes)", txt("s_scanIntervalMinutes", s.scanIntervalMinutes, "45")) +
     field("Seedbox base URL (HTTP file index)", txt("s_seedboxBaseUrl", s.seedboxBaseUrl, "https://host/private/")) +
@@ -277,7 +278,7 @@ function showConn(c){
 async function saveSettings(){
   const v=(id)=>$(id).value;
   const body={ posterSource:v("s_posterSource"), posterLang:v("s_posterLang"), posterRatingSource:v("s_posterRatingSource"),
-    geminiModel:v("s_geminiModel"),
+    geminiModel:v("s_geminiModel"), bridgeImdbIds:v("s_bridgeImdbIds"),
     scanIntervalMinutes:v("s_scanIntervalMinutes"), seedboxBaseUrl:v("s_seedboxBaseUrl"),
     seedboxUser:v("s_seedboxUser"), seedboxPass:v("s_seedboxPass"),
     movieDirs:v("s_movieDirs"), seriesDirs:v("s_seriesDirs"),
