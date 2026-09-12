@@ -379,8 +379,14 @@ async function getStreams(type, id) {
       title:
         [target.label, target.quality, target.container].filter(Boolean).join(" ") || "Direct",
     };
+    // notWebReady is mandatory here, for two independent reasons (SDK stream
+    // spec): proxyHeaders are ONLY honoured with it set, and only MP4 counts as
+    // web-ready. Without it Stremio's player fetches the URL itself with no
+    // Authorization header, the seedbox answers 401, and playback spins forever.
+    // Nuvio sends proxyHeaders either way, which is why it hid the bug.
+    stream.behaviorHints = { notWebReady: true };
     if (auth) {
-      stream.behaviorHints = { proxyHeaders: { request: { Authorization: auth } } };
+      stream.behaviorHints.proxyHeaders = { request: { Authorization: auth } };
     }
     return stream;
   });

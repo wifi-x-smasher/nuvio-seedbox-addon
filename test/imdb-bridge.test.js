@@ -128,6 +128,20 @@ test("stream claims both tt and tmdb: prefixes", () => {
   assert.ok(!meta.idPrefixes.includes("tmdb:"), "meta must not claim tmdb: either");
 });
 
+test("streams set notWebReady (required for proxyHeaders, and MKV is not web-ready)", async () => {
+  // Regression: without notWebReady, Stremio's player fetches the URL itself and
+  // ignores proxyHeaders, so the seedbox answers 401 and playback spins forever.
+  // Nuvio sends the headers regardless, which hid the bug there.
+  for (const id of ["wbx:movie:t550", "tt0137523", "tt0903747:1:1"]) {
+    const type = id.includes(":1:") ? "series" : "movie";
+    const streams = await store.getStreams(type, id);
+    assert.ok(streams.length, `no stream for ${id}`);
+    for (const s of streams) {
+      assert.equal(s.behaviorHints && s.behaviorHints.notWebReady, true, `${id} missing notWebReady`);
+    }
+  }
+});
+
 test("our own wbx: ids still resolve (no regression)", async () => {
   const streams = await store.getStreams("movie", "wbx:movie:t550");
   assert.equal(streams.length, 1);
