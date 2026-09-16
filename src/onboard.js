@@ -16,6 +16,9 @@
 const crypto = require("crypto");
 const settings = require("./settings");
 const client = require("./seedbox/client");
+const { describeFetchError, SAME_MACHINE_HINT } = require("./util/net");
+
+const TEST_TIMEOUT_MS = 15000;
 
 function isConfigured() {
   return Boolean(
@@ -78,9 +81,17 @@ async function testConnection({ baseUrl, user, pass, movieDirs, seriesDirs }) {
   const auth = "Basic " + Buffer.from(`${user}:${pass || ""}`).toString("base64");
   let res;
   try {
-    res = await fetch(base, { headers: { Authorization: auth } });
+    // Bounded so a server that accepts but never answers can't hang setup.
+    res = await fetch(base, {
+      headers: { Authorization: auth },
+      signal: AbortSignal.timeout(TEST_TIMEOUT_MS),
+    });
   } catch (e) {
-    return { ok: false, error: `Could not reach ${base} (${e.message}).` };
+    // Report the real reason (DNS, refused, timeout, certificate...) instead of
+    // Node's generic "fetch failed".
+    const why = describeFetchError(e, { timeoutMs: TEST_TIMEOUT_MS });
+    const hint = why.unreachable ? ` ${SAME_MACHINE_HINT}` : "";
+    return { ok: false, error: `Could not reach ${base}: ${why.detail}.${hint}` };
   }
   if (res.status === 401) {
     return { ok: false, error: "Authentication failed — check the username/password." };

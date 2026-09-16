@@ -9,6 +9,10 @@
 // fetches the file URL with the Authorization header we attach to streams.
 
 const settings = require("../settings");
+const { describeFetchError, SAME_MACHINE_HINT } = require("../util/net");
+
+const LIST_TIMEOUT_MS = 20000;
+const TEST_TIMEOUT_MS = 15000;
 
 function authHeaderValue() {
   const httpUser = settings.get("seedboxUser");
@@ -74,7 +78,14 @@ function parseIndexHtml(html) {
 async function listDir(encodedRelPath) {
   const rel = encodedRelPath.replace(/^\/+/, "");
   const url = fileUrl(rel);
-  const res = await fetch(url, { headers: authHeaders(), signal: AbortSignal.timeout(20000) });
+  let res;
+  try {
+    res = await fetch(url, { headers: authHeaders(), signal: AbortSignal.timeout(LIST_TIMEOUT_MS) });
+  } catch (err) {
+    // The scan logs this message; give the real reason, not "fetch failed".
+    const why = describeFetchError(err, { timeoutMs: LIST_TIMEOUT_MS });
+    throw new Error(`Could not reach ${url}: ${why.detail}`, { cause: err });
+  }
   if (res.status === 401) {
     throw new Error(`Auth failed (401) for ${url}. Check SEEDBOX_HTTP_USER/PASS.`);
   }
@@ -100,18 +111,21 @@ async function testConnection() {
   } catch (err) {
     return { ok: false, error: err.message };
   }
+  let res;
   try {
-    const res = await fetch(url, { headers: authHeaders(), signal: AbortSignal.timeout(15000) });
-    if (res.status === 401) {
-      return { ok: false, status: 401, error: "Authentication failed — check username/password." };
-    }
-    if (!res.ok) {
-      return { ok: false, status: res.status, error: `Server returned HTTP ${res.status}.` };
-    }
-    return { ok: true, status: res.status };
+    res = await fetch(url, { headers: authHeaders(), signal: AbortSignal.timeout(TEST_TIMEOUT_MS) });
   } catch (err) {
-    return { ok: false, error: `Could not reach the server: ${err.message}` };
+    const why = describeFetchError(err, { timeoutMs: TEST_TIMEOUT_MS });
+    const hint = why.unreachable ? ` ${SAME_MACHINE_HINT}` : "";
+    return { ok: false, error: `Could not reach the server: ${why.detail}.${hint}` };
   }
+  if (res.status === 401) {
+    return { ok: false, status: 401, error: "Authentication failed: check username/password." };
+  }
+  if (!res.ok) {
+    return { ok: false, status: res.status, error: `Server returned HTTP ${res.status}.` };
+  }
+  return { ok: true, status: res.status };
 }
 
 module.exports = {

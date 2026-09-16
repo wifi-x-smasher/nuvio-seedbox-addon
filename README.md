@@ -163,6 +163,8 @@ If your seedbox lets you log in over SSH and run Node.js, this is the best home 
 
 If your seedbox gives you HTTPS on a subdomain, use the `https://…` address. Plain `http://host:port` works too.
 
+On shared seedboxes (Ultra.cc and similar), the add-on and your files live on the same machine, and some of these hosts can't reach their own public address from the inside. If **Test connection** says the connection was refused or timed out, see [Troubleshooting](#troubleshooting) before saving.
+
 </details>
 
 <details>
@@ -203,7 +205,7 @@ Opening `…/setup` gives you a short form:
 
 ![The setup page](docs/preview-1.png)
 
-1. **Seedbox connection.** Paste your seedbox index URL (e.g. `https://yourbox.host/private/`) and your username and password, then click **Test connection**. It checks that the add-on can reach the box and find your `Movies` and `TV Shows` folders. If your folders have other names, type them in (comma-separated for several).
+1. **Seedbox connection.** Paste your seedbox index URL (e.g. `https://yourbox.host/private/`) and your username and password, then click **Test connection**. It checks that the add-on can reach the box and find your `Movies` and `TV Shows` folders. If your folders have other names, type them in (comma-separated for several). If the test fails, the message says why; see [Troubleshooting](#troubleshooting).
 2. **Metadata.** Paste the TMDB key from Step 1. Gemini and RPDB keys are optional; leave them blank if you don't have them.
 3. **This add-on.** Give it a display name (e.g. "My Library"). Leave the Public URL as suggested unless your option above told you to set it.
 4. Click **Save & start**. The add-on generates a secret install link and an admin password (the password is shown once, so copy it), and starts its first library scan. The first scan can take a few minutes.
@@ -237,6 +239,38 @@ Open the admin link from the setup page (your install link with `/admin` on the 
 - find titles that didn't match and pin the right TMDB id;
 - run a quick rescan (new items only) or a full re-match;
 - change settings (keys, folders, poster style, scan interval) and have them apply without a restart.
+
+## Troubleshooting
+
+### Test connection fails
+
+The error message ends with the reason. Find it below.
+
+**Connection refused, timed out, or network/host unreachable.** The add-on could not open a connection to your index URL at all, so your folders, symlinks and permissions are not the problem yet.
+
+- **If the add-on runs on the same seedbox as your files**, the likeliest cause is that the machine can't reach its own public address, even though the URL opens fine in your browser at home. Confirm it from an SSH session on the seedbox:
+  ```
+  curl -sI -u 'USERNAME:PASSWORD' https://your-index-url/
+  ```
+  If that also fails, it's a network limit of the host, not the add-on. Ask your provider how a program on your slot can reach your own web server by its public address, or run the add-on somewhere else (at home, or Render) where that address works.
+- **Don't switch the index URL to a local address** such as `http://127.0.0.1/...` to make the test pass. The same URL is what Nuvio and Stremio stream your videos from, so a local address breaks playback on every other device.
+- **If the reason lists an IPv6 address** (one containing `:`, like `2001:db8::1:443`), the machine may not be able to reach IPv6. Use Node 20 or newer, which falls back to IPv4 by itself (`node -v` to check; Option C shows how to install it).
+
+**Hostname not found.** Check the URL for typos. If it's right, the machine running the add-on can't look the name up; ask your provider.
+
+**HTTPS certificate problem.** Node doesn't trust the certificate. Open the URL in a browser; if it shows a security warning, fix the certificate first. Self-signed certificates aren't supported.
+
+**Server returned HTTP 401.** Wrong username or password.
+
+**Server returned HTTP 403 or 404.** The connection works but the path is wrong, or the web server won't list that folder. If the folder is a symlink inside your web folder, the web server may not be allowed to follow symlinks.
+
+**Saving anyway doesn't get around it.** The library scan reads your folders over the same connection, so the library stays empty until the test passes.
+
+### The admin or install link doesn't open
+
+Both links are built from the address you opened the setup page on, unless you filled in **Public URL**. If you reached setup through a different address than the one that actually reaches the add-on (for example through your provider's web proxy), the links point to the wrong place and you may see a plain "not found" page.
+
+The admin panel is always at `ADDRESS/SECRET/admin`, where `ADDRESS` is how you reach the add-on (for example `http://yourbox.host:PORT`) and `SECRET` is the `addonSecret` value in `data/settings.json`. To fix the install link as well, set `addonBaseUrl` in that same file to the correct `ADDRESS`, restart the add-on, and reinstall it in Nuvio or Stremio.
 
 ## Advanced configuration (optional)
 
