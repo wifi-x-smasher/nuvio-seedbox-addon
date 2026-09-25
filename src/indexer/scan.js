@@ -28,6 +28,7 @@ const {
 const tmdb = require("../metadata/tmdb");
 const gemini = require("../metadata/gemini");
 const betterposters = require("../metadata/betterposters");
+const enrichment = require("../metadata/enrich");
 const store = require("../store");
 const overrides = require("../overrides").load();
 const progress = require("../progress");
@@ -657,7 +658,51 @@ async function run() {
       ` ${prunedMovies + prunedSeries} stale pruned.` +
       ` Unpicked subs: ${orphanSubs.length}. Skipped folders: ${skippedFolders.length}.`,
   );
+
+  await warmDetailCache(index);
   progress.clear();
+}
+
+// Build the detail-page data (cast, trailers, per-episode stills) for every
+// matched title now, so opening one in a player is a cache read instead of a
+// live TMDB round trip. That difference is large (measured elsewhere at 1.1s
+// cold vs 0.025s warm) and worse on low-powered devices like a TV stick. Titles
+// already cached cost nothing, so later scans only pay for what is new.
+// Failures are ignored: the detail page still works, it is just built on first
+// open as before.
+const TMDB_ITEM_ID = /^wbx:(?:movie|series):t(\d+)$/;
+async function warmDetailCache(index) {
+  const items = [...(index.movies || []), ...(index.series || [])].filter((it) =>
+    TMDB_ITEM_ID.test(it.id || ""),
+  );
+  if (!items.length) return;
+
+  prog.phase = "warming";
+  prog.current = null;
+  pub();
+
+  let fetched = 0;
+  let failed = 0;
+  for (const item of items) {
+    const tmdbId = Number(item.id.match(TMDB_ITEM_ID)[1]);
+    const started = Date.now();
+    try {
+      if (!(await enrichment.enrich(item, tmdbId))) failed++;
+    } catch {
+      failed++;
+    }
+    // A cache hit returns in a millisecond; only a real fetch needs throttling.
+    if (Date.now() - started > 200) {
+      fetched++;
+      prog.current = item.name;
+      pub();
+      await sleep(TMDB_DELAY_MS);
+    }
+  }
+  console.log(
+    `Detail cache warmed: ${fetched} fetched, ${items.length - fetched - failed} already cached,` +
+      ` ${failed} failed.`,
+  );
 }
 
 // Guard against a second scan racing this one (manual + scheduled overlap).

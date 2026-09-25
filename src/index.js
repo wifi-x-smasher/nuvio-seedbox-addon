@@ -29,6 +29,7 @@ const admin = require("./admin");
 const onboard = require("./onboard");
 const manifest = require("./manifest");
 const progress = require("./progress");
+const { enableGzip } = require("./util/gzip");
 const logger = require("./logger");
 
 logger.install(); // mirror console output into the in-memory buffer (admin "Recent log")
@@ -67,6 +68,11 @@ function handleRequest(req, res) {
     res.end("ok");
     return;
   }
+
+  // Compress text responses (catalog/meta JSON, admin and setup pages,
+  // subtitles). Cheap here, and it is the slow-link part of every request on a
+  // TV or a phone on mobile data.
+  enableGzip(req, res);
 
   // Public brand assets (logo) — referenced by the manifest so Stremio/Nuvio
   // show it in the add-on list. Served without the secret (not sensitive).
@@ -110,6 +116,8 @@ function handleRequest(req, res) {
   if (req.url === "/manifest.json") {
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     res.setHeader("Access-Control-Allow-Origin", "*");
+    // Short: a scan can add a catalog row, and clients re-read this on refresh.
+    res.setHeader("Cache-Control", "public, max-age=600, stale-while-revalidate=3600");
     res.end(JSON.stringify(manifest.build()));
     return;
   }
@@ -162,6 +170,13 @@ function createServer() {
 }
 
 const server = createServer();
+
+// Node drops an idle connection after 5s, so a player browsing for a minute
+// keeps paying for a fresh TCP + TLS handshake. Holding the connection open for
+// a browsing session removes that from every request after the first.
+// headersTimeout must stay above keepAliveTimeout.
+server.keepAliveTimeout = 65 * 1000;
+server.headersTimeout = 70 * 1000;
 
 // Friendly handling for the most common startup failure: the port is taken.
 server.on("error", (err) => {
